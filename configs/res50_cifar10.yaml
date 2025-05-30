@@ -1,0 +1,25 @@
+model: resnet50
+dataset: cifar10
+"""
+预训练模型
+1. 使用 torchvision 文档中名称
+例如：IMAGENET1K_V1、IMAGENET1K_V2、DEFAULT
+
+2. True or False，True 默认使用 DEFAULT 参数
+
+3. 使用本地参数文件
+"""
+pretrained: True
+
+train:
+  enable: True
+  optimizer: adam
+  loss: cross_entropy
+  epochs: 100
+  batchsize: 128
+
+val:
+  enable: False
+
+test:
+  enable: False
