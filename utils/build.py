@@ -1,36 +1,125 @@
+import os
 import warnings
 from pathlib import Path
+
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import torchvision.models as models
+import torchvision.datasets as datasets
+
+from archs import *
 
 
-def build_model(cfg):
-    name = cfg.model.lower()
-    pretrained = cfg.get("pretrained", False)
+def get_torch_obj(name, modules):
+    name_low = name.lower()
+    for mod in modules:
+        # 大小写完全匹配
+        if hasattr(mod, name):
+            return getattr(mod, name)
+        # 大小写模糊匹配
+        for key in dir(mod):
+            if key.lower() == name_low:
+                return getattr(mod, key)
+    return None
 
-    # torch model
-    if hasattr(models, name):
-        model_class = getattr(models, name)
 
-        if isinstance(pretrained, bool):
-            weights = "DEFAULT" if pretrained else None
-        elif isinstance(pretrained, str):
-            weights = None if Path(pretrained).is_file() else pretrained
+class Builder:
+    def __init__(self, cfg, gpu_id):
+        self.cfg = cfg
+        self.gpu_id = gpu_id
+        self.weights = None
+
+    def build_model(self):
+        name = self.cfg.model
+        pretrained = self.cfg.get("pretrained", False)
+        obj = get_torch_obj(name, [models])
+        if obj:
+            if isinstance(pretrained, bool):
+                weights = "DEFAULT" if pretrained else None
+            elif isinstance(pretrained, str):
+                weights = None if Path(pretrained).is_file() else pretrained.upper()
+            else:
+                warnings.warn(f"pretrained={pretrained} is not supported, use weights='DEFAULT' instead")
+                weights = "DEFAULT"
+
+            if weights is not None:
+                try:
+                    weight_enum = models.get_model_weights(obj)
+                    self.weights = getattr(weight_enum, weights)
+                except Exception as e:
+                    warnings.warn(f"Failed to load weights enum for {name}: {e}")
+                    weights = None
+            model = obj(weights=weights)
+
+            if isinstance(pretrained, str) and Path(pretrained).is_file():
+                ckpt = torch.load(pretrained, map_location="cpu")
+                model.load_state_dict(ckpt.get("state_dict", ckpt))
+        # TODO: custom model
+
         else:
-            warnings.warn(f"pretrained={pretrained} is not supported, use weights='DEFAULT' instead")
-            weights = "DEFAULT"
+            raise ValueError(f"Model {name} is not supported.")
 
-        model = model_class(weights=weights)
+        return model
 
-        if isinstance(pretrained, str) and Path(pretrained).is_file():
-            ckpt = torch.load(pretrained, map_location="cpu")
-            model.load_state_dict(ckpt.get("state_dict", ckpt))
+    def build_criterion(self):
+        name = self.cfg.train.loss
+        obj = get_torch_obj(name, [nn])
+        if obj:
+            return obj()
 
-    # custom model
-    # elif
+        # TODO: custom loss
+        raise ValueError(f"Loss function {name} is not supported.")
 
-    else:
-        raise ValueError(f"Model {name} is not supported.")
+    def build_optimizer(self, model):
+        name = self.cfg.train.optimizer
+        obj = get_torch_obj(name, [optim])
+        if obj:
+            args = self.cfg.train.get('optim_params', {})
+            return obj(model.parameters(), **args)
+        else:
+            raise ValueError(f"Optimizer {name} is not supported.")
 
-    return model
+    def build_scheduler(self, optimizer):
+        name = self.cfg.train.get("scheduler", None)
+        if name is None:
+            return None
+        obj = get_torch_obj(name, [optim.lr_scheduler])
+        if obj:
+            args = self.cfg.train.get('scheduler_params', {})
+            scheduler = obj(optimizer, **args)
+            return scheduler
+        else:
+            raise ValueError(f"Scheduler {name} is not supported.")
+
+    def build_dataset(self, split):
+        is_train = split == "train"
+        name = self.cfg.dataset
+        trans = self.build_transform(is_train)
+        obj = get_torch_obj(name, [datasets])
+        if obj:
+            data_root = self.cfg.get("data_root", None) or f'./datasets/{name}/'
+            os.makedirs(data_root, exist_ok=True)
+            try:
+                return obj(root=data_root, split=split, transform=trans, download=True)
+            except TypeError:
+                pass
+            try:
+                return obj(root=data_root, train=is_train, transform=trans, download=True)
+            except TypeError:
+                pass
+            raise ValueError(
+                f"Dataset '{name}' does not support 'split' or 'train' keyword. "
+            )
+        else:
+            raise ValueError(f"Unknown Dataset {name}.")
+
+    def build_transform(self, is_train):
+        if self.weights is not None:
+            return self.weights.transforms()
+        elif self.cfg.dataset in CUSTOM_TRANSFORMS:
+            return CUSTOM_TRANSFORMS[self.cfg.dataset](self.cfg, is_train=is_train)
+        else:
+            raise ValueError(f"Dataset {self.cfg.dataset} has no matching transform.")
+
 

@@ -1,7 +1,6 @@
 from configs import load_cfg
 
 
-
 def main():
     cfg = load_cfg()
 

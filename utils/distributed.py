@@ -42,3 +42,16 @@ def cleanup_ddp():
     dist.destroy_process_group()
 
 
+def rank_zero():
+    # 多卡时，判断是否为 rank 0
+    return not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
+
+
+def reduce_tensor(tensor, op=torch.distributed.ReduceOp.SUM):
+    # 聚合多卡结果
+    if torch.distributed.is_initialized():
+        rt = tensor.clone()
+        torch.distributed.all_reduce(rt, op=op)
+        return rt
+    else:
+        return tensor

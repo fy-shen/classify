@@ -1,3 +1,4 @@
+import os
 import argparse
 from pathlib import Path
 from omegaconf import OmegaConf
@@ -19,4 +20,7 @@ def load_cfg():
     add_cfg = OmegaConf.from_dotlist(args.overrides)
     cfg = OmegaConf.merge(cfg, add_cfg)
     cfg.cfg = args.cfg
+
+    save_dir = cfg.get("save_dir", os.path.join('checkpoints', cfg.dataset, cfg.model))
+    os.makedirs(save_dir, exist_ok=True)
     return cfg
