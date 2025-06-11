@@ -5,7 +5,7 @@ from omegaconf import OmegaConf
 import torch
 import torch.nn as nn
 
-from archs import CUSTOM_MODULES
+from . import CUSTOM_MODULES
 
 
 class Model(nn.Module):

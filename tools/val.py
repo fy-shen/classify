@@ -3,7 +3,7 @@ import torch
 from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero, reduce_tensor
 
 
-def val_epoch(model, loader, criterion, gpu_id, epoch):
+def val_epoch(model, loader, criterion, gpu_id):
     model.eval()
     total_loss = 0.0
     total_correct = 0
@@ -30,7 +30,6 @@ def val_epoch(model, loader, criterion, gpu_id, epoch):
     if rank_zero():
         avg_loss = total_loss_tensor.item() / (total_samples_tensor.item())
         avg_acc = total_correct_tensor.item() / (total_samples_tensor.item())
-        print(f"[Epoch {epoch:>03d}] Val   Loss: {avg_loss:.4f} | Acc: {avg_acc:.2%}")
-        return avg_acc
+        return avg_acc, avg_loss
 
-    return None
+    return None, None

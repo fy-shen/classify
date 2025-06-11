@@ -1,0 +1,39 @@
+model: resnet18
+model_cfg:
+save_dir:
+
+num_classes: 10
+dataset: cifar10
+data_root: datasets/cifar10
+data_trans:
+num_workers: 8
+
+train:
+  enable: True
+  #预训练模型
+  #1. torchvision API, 例如：IMAGENET1K_V1、IMAGENET1K_V2、DEFAULT
+  #2. True or False，True 默认使用 DEFAULT 参数
+  #3. 本地参数文件
+  pretrained: True
+  optimizer: SGD
+  optim_params:
+    lr: 0.1
+    momentum: 0.9
+    weight_decay: 5e-4
+
+  scheduler: StepLR
+  scheduler_params:
+    step_size: 10
+    gamma: 0.5
+
+  loss: crossentropyloss
+  epochs: 50
+  batchsize: 128
+  resume: False
+  resume_path: 'checkpoints/cifar10/resnet50/last.pth'
+
+val:
+  enable: False
+
+test:
+  enable: False

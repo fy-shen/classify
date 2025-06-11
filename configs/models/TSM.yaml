@@ -1,0 +1,9 @@
+base_model: resnet50
+pretrained: True
+
+is_shift: True
+num_seg: 8
+shift_div: 8
+temporal_pool: False
+
+non_local: False

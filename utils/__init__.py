@@ -14,7 +14,7 @@ def set_random_seed(seed: int, deterministic: bool = False):
     """
     # 出于安全考虑（哈希冲突攻击），Python 哈希操作的种子是随机生成的，例如遍历字典或集合时的顺序不同
     # PYTHONHASHSEED 只对 当前 Python 进程中创建的哈希函数有效，若使用 multiprocessing 子进程中也要显式设置
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -29,3 +29,26 @@ def set_random_seed(seed: int, deterministic: bool = False):
     else:
         torch.backends.cudnn.deterministic = False
         torch.backends.cudnn.benchmark = True
+
+
+class Logger:
+    def __init__(self, cfg):
+        self.log_path = os.path.join(cfg.save_dir, 'log.txt')
+        if cfg.train.get("resume", False):
+            with open(self.log_path, "a") as f:
+                f.write("\n\nResuming from checkpoint...\n")
+        else:
+            with open(self.log_path, "w") as f:
+                f.write(f"Training {cfg.model} on dataset {cfg.dataset}\n")
+
+    def log(self, msg, print_out=True):
+        if print_out:
+            print(msg)
+        with open(self.log_path, "a") as f:
+            f.write(msg + "\n")
+
+    def log_train_tools(self, model, optimizer, scheduler, cfg):
+        self.log(f"\nModel:\n{str(model)}")
+        self.log(f"\nOptimizer: {type(optimizer).__name__} | Params: {sum(p.numel() for p in model.parameters())}")
+        if scheduler:
+            self.log(f"Scheduler: {type(scheduler).__name__} | Params: {cfg.train.get('scheduler_params', {})}")

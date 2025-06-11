@@ -1,3 +1,6 @@
+import os
+import importlib
+import pkgutil
 from typing import Optional, Callable, Union
 
 
@@ -29,3 +32,7 @@ def register(kind: str, name: Optional[Union[str, Callable]] = None):
         name = None
         return decorator(obj)
     return decorator
+
+
+for _, modname, ispkg in pkgutil.walk_packages(path=[os.path.dirname(__file__)], prefix=f"{__name__}."):
+    importlib.import_module(modname)

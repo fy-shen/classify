@@ -22,5 +22,6 @@ def load_cfg():
     cfg.cfg = args.cfg
 
     save_dir = cfg.get("save_dir", os.path.join('checkpoints', cfg.dataset, cfg.model))
+    cfg.save_dir = save_dir
     os.makedirs(save_dir, exist_ok=True)
     return cfg
