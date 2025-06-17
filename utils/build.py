@@ -9,20 +9,7 @@ import torch.optim as optim
 import torchvision.models as models
 import torchvision.datasets as datasets
 
-from archs import CUSTOM_SET
-
-
-def get_torch_obj(name, modules):
-    name_low = name.lower()
-    for mod in modules:
-        # 大小写完全匹配
-        if hasattr(mod, name):
-            return getattr(mod, name)
-        # 大小写模糊匹配
-        for key in dir(mod):
-            if key.lower() == name_low:
-                return getattr(mod, key)
-    return None
+from archs import CUSTOM_SET, get_torch_obj
 
 
 class Builder:
@@ -68,7 +55,19 @@ class Builder:
             model_cfg = self.cfg.get("model_cfg", None)
             if model_cfg is None:
                 raise ValueError(f"Custom model '{name}' requires `model_cfg` to be specified in config.")
-            return CUSTOM_SET['model'][name.lower()](model_cfg)
+            model = CUSTOM_SET['model'][name.lower()](OmegaConf.load(model_cfg))
+            if Path(self.cfg.train.pretrained).is_file():
+                ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
+                ckpt = ckpt.get("state_dict", ckpt)
+                sd = {}
+                for k, v in ckpt.items():
+                    if 'fc' not in k:
+                        if k.startswith('module.'):
+                            sd[k[len('module.'):]] = v
+                        else:
+                            sd[k] = v
+                model.load_state_dict(sd, strict=False)
+            return model
         else:
             raise ValueError(f"Model {name} is not supported.")
 
@@ -123,6 +122,9 @@ class Builder:
             raise ValueError(
                 f"Dataset '{name}' does not support 'split' or 'train' keyword. "
             )
+        # custom dataset
+        elif name.lower() in CUSTOM_SET['dataset']:
+            return CUSTOM_SET['dataset'][name.lower()](self.cfg, is_train, transform=trans)
         else:
             raise ValueError(f"Unknown Dataset {name}.")
 
@@ -134,7 +136,7 @@ class Builder:
         except Exception:
             pass
 
-        # 尝试加载自定义 transform
+        # custom transform
         if self.cfg.data_trans in CUSTOM_SET['transform']:
             return CUSTOM_SET['transform'][self.cfg.data_trans](self.cfg, is_train=is_train)
 

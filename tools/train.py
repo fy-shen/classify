@@ -74,15 +74,18 @@ def train_worker(rank, cfg):
     if cfg.GPU_NUM > 1:
         sampler_train = DistributedSampler(dataset_train, num_replicas=cfg.GPU_NUM, rank=rank, shuffle=True, drop_last=True)
         sampler_val = DistributedSampler(dataset_val, num_replicas=cfg.GPU_NUM, rank=rank, shuffle=False, drop_last=False)
+        shuffle = False
     else:
         sampler_train = None
         sampler_val = None
+        shuffle = True
     loader_train = DataLoader(
         dataset_train,
         batch_size=cfg.train.batchsize,
         num_workers=cfg.num_workers,
         pin_memory=True,
         sampler=sampler_train,
+        shuffle=shuffle
     )
     loader_val = DataLoader(
         dataset_val,

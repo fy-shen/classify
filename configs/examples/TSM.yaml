@@ -1,0 +1,46 @@
+model: TSN
+model_cfg: configs/models/TSM.yaml
+save_dir:
+
+num_classes: 2
+dataset: TSNDataset
+data_trans: fight_tsm_rgb
+modality: RGB
+num_workers: 8
+input_size: 224
+data_params:
+  root_path: /media/sfy/disk1/dataset/Fight
+  train_list: fight_train.txt
+  val_list: fight_val.txt
+  image_tmpl: '{:05d}.jpg'
+  dense_sample: False
+  clip_len: 64
+  new_length: 1
+  num_sample: 1
+  twice_sample: False
+
+train:
+  enable: True
+  pretrained: '/home/sfy/SFY/Code/temporal-shift-module/pretrained/TSM_kinetics_RGB_resnet50_shift8_blockres_avg_segment8_e50.pth'
+  optimizer: SGD
+  optim_params:
+    lr: 0.0005
+    momentum: 0.9
+    weight_decay: 5e-4
+
+  scheduler: StepLR
+  scheduler_params:
+    step_size: 10
+    gamma: 0.5
+
+  loss: crossentropyloss
+  epochs: 30
+  batchsize: 16
+  resume: False
+  resume_path:
+
+val:
+  enable: False
+
+test:
+  enable: False

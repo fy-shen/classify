@@ -88,25 +88,42 @@ class NonLocalBlockND(nn.Module):
         return z
 
 
-class NONLocalBlock1D(NonLocalBlockND):
+class NonLocalBlock1D(NonLocalBlockND):
     def __init__(self, in_channels, inter_channels=None, sub_sample=True, bn_layer=True):
-        super(NONLocalBlock1D, self).__init__(
+        super(NonLocalBlock1D, self).__init__(
             in_channels, inter_channels=inter_channels, dim=1, sub_sample=sub_sample, bn_layer=bn_layer
         )
 
 
-class NONLocalBlock2D(NonLocalBlockND):
+class NonLocalBlock2D(NonLocalBlockND):
     def __init__(self, in_channels, inter_channels=None, sub_sample=True, bn_layer=True):
-        super(NONLocalBlock2D, self).__init__(
+        super(NonLocalBlock2D, self).__init__(
             in_channels, inter_channels=inter_channels, dim=2, sub_sample=sub_sample, bn_layer=bn_layer
         )
 
 
-class NONLocalBlock3D(NonLocalBlockND):
+class NonLocalBlock3D(NonLocalBlockND):
     def __init__(self, in_channels, inter_channels=None, sub_sample=True, bn_layer=True):
-        super(NONLocalBlock3D, self).__init__(
+        super(NonLocalBlock3D, self).__init__(
             in_channels, inter_channels=inter_channels, dim=3, sub_sample=sub_sample, bn_layer=bn_layer
         )
+
+
+class NonLocal3DWrapper(nn.Module):
+    def __init__(self, block, n_seg):
+        super(NonLocal3DWrapper, self).__init__()
+        self.block = block
+        self.n_seg = n_seg
+        self.nl = NonLocalBlock3D(block.bn3.num_features)
+
+    def forward(self, x):
+        x = self.block(x)
+
+        nt, c, h, w = x.size()
+        x = x.view(nt // self.n_seg, self.n_seg, c, h, w).transpose(1, 2)  # n, c, t, h, w
+        x = self.nl(x)
+        x = x.transpose(1, 2).contiguous().view(nt, c, h, w)
+        return x
 
 
 class TemporalShiftBlock(nn.Module):
@@ -140,20 +157,3 @@ class TemporalShiftBlock(nn.Module):
             out[:, :, 2 * fold:] = x[:, :, 2 * fold:]  # not shift
 
         return out.view(nt, c, h, w)
-
-
-class NonLocal3DWrapper(nn.Module):
-    def __init__(self, block, n_seg):
-        super(NonLocal3DWrapper, self).__init__()
-        self.block = block
-        self.n_seg = n_seg
-        self.nl = NONLocalBlock3D(block.bn3.num_features)
-
-    def forward(self, x):
-        x = self.block(x)
-
-        nt, c, h, w = x.size()
-        x = x.view(nt // self.n_seg, self.n_seg, c, h, w).transpose(1, 2)  # n, c, t, h, w
-        x = self.nl(x)
-        x = x.transpose(1, 2).contiguous().view(nt, c, h, w)
-        return x

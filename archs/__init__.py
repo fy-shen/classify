@@ -8,12 +8,14 @@ CUSTOM_MODELS = {}
 CUSTOM_MODULES = {}
 CUSTOM_LOSSES = {}
 CUSTOM_TRANSFORMS = {}
+CUSTOM_DATASETS = {}
 
 CUSTOM_SET = {
     'model': CUSTOM_MODELS,
     'module': CUSTOM_MODULES,
     'loss': CUSTOM_LOSSES,
-    'transform': CUSTOM_TRANSFORMS
+    'transform': CUSTOM_TRANSFORMS,
+    'dataset': CUSTOM_DATASETS,
 }
 
 
@@ -32,6 +34,19 @@ def register(kind: str, name: Optional[Union[str, Callable]] = None):
         name = None
         return decorator(obj)
     return decorator
+
+
+def get_torch_obj(name, modules):
+    name_low = name.lower()
+    for mod in modules:
+        # 大小写完全匹配
+        if hasattr(mod, name):
+            return getattr(mod, name)
+        # 大小写模糊匹配
+        for key in dir(mod):
+            if key.lower() == name_low:
+                return getattr(mod, key)
+    return None
 
 
 for _, modname, ispkg in pkgutil.walk_packages(path=[os.path.dirname(__file__)], prefix=f"{__name__}."):

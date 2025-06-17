@@ -3,6 +3,8 @@ tqdm
 omegaconf
 hydra-core
 numpy
+matplotlib
+pillow
 
 torch==2.7.0+cu118
 torchvision==0.22.0+cu118

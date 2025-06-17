@@ -1,16 +1,17 @@
 from torch import nn
 import torchvision.models as models
 
-from archs import register
+from archs import register, get_torch_obj
 from archs.modules.conv import TemporalShiftBlock, NonLocal3DWrapper
-from utils.build import get_torch_obj
 
 
 @register('model')
 class TSN(nn.Module):
     def __init__(self, cfg):
-        super().__init__()
+        super(TSN, self).__init__()
         self.cfg = cfg
+
+        self._build_base_model()
 
     def _build_base_model(self):
         base_model = self.cfg.base_model.lower()
@@ -28,6 +29,42 @@ class TSN(nn.Module):
                 make_non_local(
                     self.base_model, self.cfg.num_seg
                 )
+            in_features = self.base_model.fc.in_features
+            self.base_model.fc = nn.Dropout(p=self.cfg.dropout)
+        else:
+            raise ValueError(f"{self.cfg.base_model} is not supported")
+
+        self.new_fc = nn.Linear(in_features, self.cfg.num_classes)
+        nn.init.normal_(self.new_fc.weight, 0, 0.001)
+        nn.init.constant_(self.new_fc.bias, 0)
+
+    def train(self, mode=True):
+        super(TSN, self).train(mode)
+        # Freeze BN
+        count = 0
+        if self.cfg.partial_bn and mode:
+            for m in self.base_model.modules():
+                if isinstance(m, nn.BatchNorm2d):
+                    count += 1
+                    if count >= (1 if self.cfg.freeze_first_bn else 2):
+                        m.eval()
+                        m.weight.requires_grad = False
+                        m.bias.requires_grad = False
+
+    def forward(self, x):
+        b, t, c, h, w = x.shape
+        x = x.view(-1, c, h, w)
+        out = self.base_model(x)
+        out = self.new_fc(out)
+
+        if self.cfg.is_shift and self.cfg.temporal_pool:
+            out = out.view((-1, self.cfg.num_seg // 2) + out.size()[1:])
+        else:
+            out = out.view((-1, self.cfg.num_seg) + out.size()[1:])
+
+        if self.cfg.consensus_type == 'avg':
+            out = out.mean(dim=1)
+        return out.squeeze(1)
 
 
 def make_temporal_shift(net, n_seg, n_div, temporal_pool=False):
