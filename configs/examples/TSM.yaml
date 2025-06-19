@@ -1,6 +1,6 @@
 model: TSN
 model_cfg: configs/models/TSM.yaml
-save_dir:
+save_dir: checkpoints/Fight/TSM_RGB_NoPretrain
 
 num_classes: 2
 dataset: TSNDataset
@@ -21,7 +21,7 @@ data_params:
 
 train:
   enable: True
-  pretrained: '/home/sfy/SFY/Code/temporal-shift-module/pretrained/TSM_kinetics_RGB_resnet50_shift8_blockres_avg_segment8_e50.pth'
+  pretrained: False
   optimizer: SGD
   optim_params:
     lr: 0.0005
@@ -34,8 +34,8 @@ train:
     gamma: 0.5
 
   loss: crossentropyloss
-  epochs: 30
-  batchsize: 16
+  epochs: 50
+  batchsize: 24
   resume: False
   resume_path:
 

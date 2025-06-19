@@ -1,6 +1,8 @@
 import os
 import random
 import numpy as np
+from omegaconf import OmegaConf
+from tqdm import tqdm
 import torch
 
 
@@ -41,14 +43,32 @@ class Logger:
             with open(self.log_path, "w") as f:
                 f.write(f"Training {cfg.model} on dataset {cfg.dataset}\n")
 
+    @staticmethod
+    def make_separator(title, width=60, fill='='):
+        if title:
+            title = f" {title} "
+        return f"{title:{fill}^{width}}"
+
     def log(self, msg, print_out=True):
         if print_out:
+            # tqdm.write(msg)
             print(msg)
         with open(self.log_path, "a") as f:
             f.write(msg + "\n")
 
     def log_train_tools(self, model, optimizer, scheduler, cfg):
-        self.log(f"\nModel:\n{str(model)}")
-        self.log(f"\nOptimizer: {type(optimizer).__name__} | Params: {sum(p.numel() for p in model.parameters())}")
+        msg = '\n' + self.make_separator("Model") + '\n'
+        msg += str(model)
+        msg += '\n' + self.make_separator("Optimizer") + '\n'
+        msg += f"{type(optimizer).__name__} | Params: {sum(p.numel() for p in model.parameters())}"
         if scheduler:
-            self.log(f"Scheduler: {type(scheduler).__name__} | Params: {cfg.train.get('scheduler_params', {})}")
+            msg += '\n' + self.make_separator("Scheduler") + '\n'
+            msg += f"{type(scheduler).__name__} | Params: {cfg.train.get('scheduler_params', {})}"
+        msg += '\n' + self.make_separator("")
+        self.log(msg)
+
+    def log_cfg(self, cfg):
+        msg = '\n' + self.make_separator("Config") + '\n'
+        msg += OmegaConf.to_yaml(cfg, resolve=True)
+        msg += '\n' + self.make_separator("")
+        self.log(msg)

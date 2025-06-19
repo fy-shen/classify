@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 from tqdm import tqdm
 
@@ -10,52 +11,60 @@ from torch.utils.data import DataLoader, DistributedSampler
 from utils import set_random_seed, Logger
 from utils.build import Builder
 from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero, reduce_tensor
-from tools.val import val_epoch
 
 
-def train_epoch(model, loader, criterion, optimizer, scheduler, epoch, gpu_id, logger):
-    model.train()
-    total_loss = 0.0
-    total_correct = 0
-    total_samples = 0
+def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, epoch=None, is_train=True):
+    model.train() if is_train else model.eval()
+    total_loss = torch.tensor(0.0, device=gpu_id)
+    total_correct = torch.tensor(0, device=gpu_id)
+    total_samples = torch.tensor(0, device=gpu_id)
+    desc = f"[Train Epoch {epoch:>3d}]" if is_train else f"[Val]"
+    pbar = tqdm(loader, desc=desc, ncols=100) if rank_zero() else loader
+    with torch.set_grad_enabled(is_train):
+        for step, (inputs, targets) in enumerate(pbar):
+            inputs = inputs.to(gpu_id, non_blocking=True)
+            targets = targets.to(gpu_id, non_blocking=True)
 
-    pbar = tqdm(loader, desc=f"[Train Epoch {epoch:>3d}]", ncols=100) if rank_zero() else loader
-    for step, (inputs, targets) in enumerate(pbar):
-        inputs = inputs.to(gpu_id, non_blocking=True)
-        targets = targets.to(gpu_id, non_blocking=True)
+            if is_train:
+                optimizer.zero_grad()
 
-        optimizer.zero_grad()
-        outputs = model(inputs)
-        loss = criterion(outputs, targets)
-        loss.backward()
-        optimizer.step()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
 
-        total_loss += loss.item() * inputs.size(0)
-        _, preds = outputs.max(1)
-        total_correct += preds.eq(targets).sum().item()
-        total_samples += inputs.size(0)
-        if rank_zero():
-            avg_loss = total_loss / (total_samples + 1e-8)
-            avg_acc = total_correct / (total_samples + 1e-8)
-            pbar.set_postfix(loss=avg_loss, acc=f"{avg_acc:.2%}")
+            if is_train:
+                loss.backward()
+                optimizer.step()
 
-    reduced_loss = reduce_tensor(torch.tensor(total_loss, device=gpu_id))
-    reduced_acc = reduce_tensor(torch.tensor(total_correct, device=gpu_id))
-    reduced_count = reduce_tensor(torch.tensor(total_samples, device=gpu_id))
-    if rank_zero():
+            total_loss += loss.detach() * inputs.size(0)
+            _, preds = outputs.max(1)
+            total_correct += preds.eq(targets).sum()
+            total_samples += inputs.size(0)
+
+            if rank_zero():
+                avg_loss = total_loss / (total_samples + 1e-8)
+                avg_acc = total_correct / (total_samples + 1e-8)
+                pbar.set_postfix(loss=avg_loss.item(), acc=f"{avg_acc.item():.2%}")
+
+        reduced_loss = reduce_tensor(total_loss)
+        reduced_acc = reduce_tensor(total_correct)
+        reduced_count = reduce_tensor(total_samples)
+
         avg_loss = reduced_loss.item() / reduced_count.item()
         avg_acc = reduced_acc.item() / reduced_count.item()
-        lr = optimizer.param_groups[0]["lr"]
-        logger.log(f"Epoch {epoch:>3d} | Train: Loss={avg_loss:.3f} | Acc={avg_acc:.2%} | LR={lr:.4g} ")
 
-    if scheduler is not None:
-        scheduler.step()
+        if is_train and scheduler is not None:
+            scheduler.step()
+
+        return avg_loss, avg_acc
 
 
 def train_worker(rank, cfg):
     logger = Logger(cfg) if rank_zero() else None
+    logger.log_cfg(cfg) if rank_zero() else None
     set_random_seed(cfg.SEED, cfg.DETERMINISTIC)
     gpu_id = cfg.GPU_IDS[rank]
+
+    start_time = time.time()
 
     builder = Builder(cfg, gpu_id, logger)
     model = builder.build_model().to(gpu_id)
@@ -97,6 +106,13 @@ def train_worker(rank, cfg):
 
     best_acc = 0.0
     start_epoch = 0
+    best_ckpt = {
+        "epoch": -1,
+        "train_loss": None,
+        "train_acc": None,
+        "val_loss": None,
+        "val_acc": None
+    }
     if cfg.train.get("resume", False):
         if Path(cfg.train.resume_path).is_file():
             checkpoint = torch.load(cfg.train.resume_path, map_location=f"cuda:{gpu_id}")
@@ -120,7 +136,13 @@ def train_worker(rank, cfg):
     for epoch in range(start_epoch, cfg.train.epochs):
         if sampler_train is not None:
             sampler_train.set_epoch(epoch)
-        train_epoch(model, loader_train, criterion, optimizer, scheduler, epoch, gpu_id, logger)
+        train_loss, train_acc = run_epoch(
+            model, loader_train, criterion, gpu_id, optimizer, scheduler, epoch, is_train=True
+        )
+        if rank_zero():
+            lr = optimizer.param_groups[0]["lr"]
+            logger.log(f"Epoch {epoch:>3d} | Train: Loss={train_loss:.3f} | Acc={train_acc:.2%} | LR={lr:.4g}", False)
+
         ckpt = {
             "epoch": epoch,
             "model": model.module.state_dict() if isinstance(model, DDP) else model.state_dict(),
@@ -128,16 +150,39 @@ def train_worker(rank, cfg):
             "scheduler": scheduler.state_dict() if scheduler else None,
             "best_acc": best_acc,
         }
+        # evaluate every EVAL_PERIOD epochs
         if (epoch + 1) % cfg.EVAL_PERIOD == 0:
-            val_acc, val_loss = val_epoch(model, loader_val, criterion, gpu_id)
+            val_loss, val_acc = run_epoch(model, loader_val, criterion, gpu_id, is_train=False)
             if rank_zero() and val_acc is not None:
-                logger.log(f"          | Val  : Loss={val_loss:.3f} | Acc={val_acc:.2%}")
-                if val_acc > best_acc:
+                logger.log(f"          | Val  : Loss={val_loss:.3f} | Acc={val_acc:.2%}", False)
+                if val_acc >= best_acc:
                     best_acc = val_acc
                     ckpt["best_acc"] = best_acc
                     torch.save(ckpt, os.path.join(cfg.save_dir, "best.pth"))
-
+                    best_ckpt.update({
+                        "epoch": epoch,
+                        "train_loss": train_loss,
+                        "train_acc": train_acc,
+                        "val_loss": val_loss,
+                        "val_acc": val_acc
+                    })
         torch.save(ckpt, os.path.join(cfg.save_dir, "last.pth"))
+
+    if rank_zero():
+        end_time = time.time()
+        duration = end_time - start_time
+        h = int(duration // 3600)
+        m = int((duration % 3600) // 60)
+        s = int(duration % 60)
+        logger.log(f"\nTraining finished in {h:02d}:{m:02d}:{s:02d}")
+
+        if best_ckpt["epoch"] >= 0:
+            logger.log(f"Best Model Info:")
+            logger.log(f"  Epoch       : {best_ckpt['epoch']}")
+            logger.log(f"  Train Loss  : {best_ckpt['train_loss']:.4f}")
+            logger.log(f"  Train Acc   : {best_ckpt['train_acc']:.2%}")
+            logger.log(f"  Val Loss    : {best_ckpt['val_loss']:.4f}")
+            logger.log(f"  Val Acc     : {best_ckpt['val_acc']:.2%}")
     if cfg.GPU_NUM > 1:
         cleanup_ddp()
 

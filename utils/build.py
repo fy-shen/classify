@@ -56,7 +56,8 @@ class Builder:
             if model_cfg is None:
                 raise ValueError(f"Custom model '{name}' requires `model_cfg` to be specified in config.")
             model = CUSTOM_SET['model'][name.lower()](OmegaConf.load(model_cfg))
-            if Path(self.cfg.train.pretrained).is_file():
+            # TODO: pretrain
+            if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
                 ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
                 ckpt = ckpt.get("state_dict", ckpt)
                 sd = {}
