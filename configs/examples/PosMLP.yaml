@@ -1,8 +1,9 @@
-model: TSN
-model_cfg: configs/models/TSM.yaml
+model: PosMLP
+model_cfg: configs/models/PosMLP.yaml
 save_dir:
 
 num_classes: 2
+num_seg: 8
 dataset: TSNDataset
 data_trans: fight_tsm_rgb
 modality: RGB
@@ -22,20 +23,20 @@ data_params:
 train:
   enable: True
   pretrained: False
-  optimizer: SGD
+  optimizer: AdamW
   optim_params:
-    lr: 0.0005
-    momentum: 0.9
-    weight_decay: 5e-4
+    lr: 4e-4
+    betas: [0.9, 0.999]
+    weight_decay: 1e-8
 
-  scheduler: StepLR
+  scheduler: CosineAnnealingLR
   scheduler_params:
-    step_size: 10
-    gamma: 0.5
+    T_max: 100
+    eta_min: 1e-6
 
   loss: crossentropyloss
-  epochs: 50
-  batchsize: 24
+  epochs: 100
+  batchsize: 16
   resume: False
   resume_path:
 

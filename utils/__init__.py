@@ -2,7 +2,12 @@ import os
 import random
 import numpy as np
 from omegaconf import OmegaConf
-from tqdm import tqdm
+from prettytable import PrettyTable
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 import torch
 
 
@@ -35,7 +40,9 @@ def set_random_seed(seed: int, deterministic: bool = False):
 
 class Logger:
     def __init__(self, cfg):
+        self.save_dir = cfg.save_dir
         self.log_path = os.path.join(cfg.save_dir, 'log.txt')
+        self.history = {}
         if cfg.train.get("resume", False):
             with open(self.log_path, "a") as f:
                 f.write("\n\nResuming from checkpoint...\n")
@@ -72,3 +79,50 @@ class Logger:
         msg += OmegaConf.to_yaml(cfg, resolve=True)
         msg += '\n' + self.make_separator("")
         self.log(msg)
+
+    def log_pretrain_msg(self, missing_keys, unexpected_keys):
+        msg = '\n' + self.make_separator("Pretrain") + '\n'
+
+        t1 = PrettyTable(["Missing Keys"])
+        t1.align["Missing Keys"] = "l"
+        for k in missing_keys:
+            t1.add_row([k])
+
+        t2 = PrettyTable(["Unexpected Keys"])
+        t2.align["Unexpected Keys"] = "l"
+        for k in unexpected_keys:
+            t2.add_row([k])
+        msg += t1.get_string()
+        msg += '\n' + t2.get_string()
+        msg += '\n' + self.make_separator("")
+        self.log(msg)
+
+    def update_history(self, phase, metrics):
+        for key, value in metrics.items():
+            name = f"{phase}_{key}"
+            if name not in self.history:
+                self.history[name] = []
+            self.history[name].append(value)
+
+    def plot_history(self):
+        self.plot_pic('loss', 'Loss', 'Train and Val Loss', 'loss.png')
+        self.plot_pic('acc', 'Acc', 'Train and Val Acc', 'acc.png')
+
+    def plot_pic(self, key, ylabel, title, fn):
+        plt.figure(figsize=(10, 6))
+        for phase in ['train', 'val']:
+            y_key = f"{phase}_{key}"
+            x_key = f"{phase}_epoch"
+            if y_key in self.history:
+                y = self.history[y_key]
+                x = self.history[x_key]
+                plt.plot(x, y, label=y_key)
+
+        plt.xlabel("Epoch")
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.legend()
+        plt.grid(True)
+        loss_path = os.path.join(self.save_dir, fn)
+        plt.savefig(loss_path)
+        plt.close()

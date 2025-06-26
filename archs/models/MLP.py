@@ -1,11 +1,11 @@
 import torch.nn as nn
 
 from archs import register
-from archs.tasks import Model
+from archs.tasks import BaseModel
 
 
 @register('model')
-class MLP(Model):
+class MLP(BaseModel):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.init_weights()

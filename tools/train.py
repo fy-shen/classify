@@ -128,6 +128,8 @@ def train_worker(rank, cfg):
             if rank_zero():
                 lr = optimizer.param_groups[0]["lr"]
                 logger.log(f"Resumed from epoch {start_epoch}, best_acc={best_acc:.2%}, lr={lr}")
+                if 'history' in checkpoint:
+                    logger.history = checkpoint['history']
         else:
             raise FileNotFoundError(f"No such pretrain file: {cfg.train.resume_path}")
 
@@ -142,7 +144,7 @@ def train_worker(rank, cfg):
         if rank_zero():
             lr = optimizer.param_groups[0]["lr"]
             logger.log(f"Epoch {epoch:>3d} | Train: Loss={train_loss:.3f} | Acc={train_acc:.2%} | LR={lr:.4g}", False)
-
+        logger.update_history('train', {'epoch': epoch, 'loss': train_loss, 'acc': train_acc})
         ckpt = {
             "epoch": epoch,
             "model": model.module.state_dict() if isinstance(model, DDP) else model.state_dict(),
@@ -153,7 +155,9 @@ def train_worker(rank, cfg):
         # evaluate every EVAL_PERIOD epochs
         if (epoch + 1) % cfg.EVAL_PERIOD == 0:
             val_loss, val_acc = run_epoch(model, loader_val, criterion, gpu_id, is_train=False)
+            logger.update_history('val', {'epoch': epoch, 'loss': val_loss, 'acc': val_acc})
             if rank_zero() and val_acc is not None:
+                ckpt["history"] = logger.history
                 logger.log(f"          | Val  : Loss={val_loss:.3f} | Acc={val_acc:.2%}", False)
                 if val_acc >= best_acc:
                     best_acc = val_acc
@@ -166,6 +170,7 @@ def train_worker(rank, cfg):
                         "val_loss": val_loss,
                         "val_acc": val_acc
                     })
+
         torch.save(ckpt, os.path.join(cfg.save_dir, "last.pth"))
 
     if rank_zero():
@@ -183,6 +188,8 @@ def train_worker(rank, cfg):
             logger.log(f"  Train Acc   : {best_ckpt['train_acc']:.2%}")
             logger.log(f"  Val Loss    : {best_ckpt['val_loss']:.4f}")
             logger.log(f"  Val Acc     : {best_ckpt['val_acc']:.2%}")
+
+        logger.plot_history()
     if cfg.GPU_NUM > 1:
         cleanup_ddp()
 

@@ -115,6 +115,7 @@ class TSNDataset(data.Dataset):
                     p += 1
 
         process_data = self.transform(images)
+        # [B,T,C,H,W], [B,]
         return process_data, record.label
 
     def __len__(self):

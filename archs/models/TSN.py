@@ -11,30 +11,42 @@ class TSN(nn.Module):
         super(TSN, self).__init__()
         self.cfg = cfg
 
+        self.num_classes = self.cfg.num_classes
+        self.base_model_name = self.cfg.base_model.lower()
+        self.pretrained = self.cfg.get("pretrained", False)
+        self.consensus_type = self.cfg.consensus_type
+
+        self.is_shift = self.cfg.is_shift
+        self.num_seg = self.cfg.num_seg
+        self.shift_div = self.cfg.shift_div
+        self.temporal_pool = self.cfg.temporal_pool
+        self.non_local = self.cfg.non_local
+        self.dropout = self.cfg.dropout
+        self.freeze_first_bn = self.cfg.freeze_first_bn
+        self.partial_bn = self.cfg.partial_bn
+
         self._build_base_model()
 
     def _build_base_model(self):
-        base_model = self.cfg.base_model.lower()
-        if "resnet" in base_model:
-            obj = get_torch_obj(base_model, [models])
-            pretrained = self.cfg.get("pretrained", False)
-            weights = "DEFAULT" if pretrained else None
+        if "resnet" in self.base_model_name:
+            obj = get_torch_obj(self.base_model_name, [models])
+            weights = "DEFAULT" if self.pretrained else None
             self.base_model = obj(weights=weights)
-            if self.cfg.is_shift:
+            if self.is_shift:
                 make_temporal_shift(
-                    self.base_model, self.cfg.num_seg, self.cfg.shift_div, self.cfg.temporal_pool
+                    self.base_model, self.num_seg, self.shift_div, self.temporal_pool
                 )
 
-            if self.cfg.non_local:
+            if self.non_local:
                 make_non_local(
-                    self.base_model, self.cfg.num_seg
+                    self.base_model, self.num_seg
                 )
             in_features = self.base_model.fc.in_features
-            self.base_model.fc = nn.Dropout(p=self.cfg.dropout)
+            self.base_model.fc = nn.Dropout(p=self.dropout)
         else:
-            raise ValueError(f"{self.cfg.base_model} is not supported")
+            raise ValueError(f"{self.base_model_name} is not supported")
 
-        self.new_fc = nn.Linear(in_features, self.cfg.num_classes)
+        self.new_fc = nn.Linear(in_features, self.num_classes)
         nn.init.normal_(self.new_fc.weight, 0, 0.001)
         nn.init.constant_(self.new_fc.bias, 0)
 
@@ -42,11 +54,11 @@ class TSN(nn.Module):
         super(TSN, self).train(mode)
         # Freeze BN
         count = 0
-        if self.cfg.partial_bn and mode:
+        if self.partial_bn and mode:
             for m in self.base_model.modules():
                 if isinstance(m, nn.BatchNorm2d):
                     count += 1
-                    if count >= (1 if self.cfg.freeze_first_bn else 2):
+                    if count >= (1 if self.freeze_first_bn else 2):
                         m.eval()
                         m.weight.requires_grad = False
                         m.bias.requires_grad = False
@@ -57,12 +69,12 @@ class TSN(nn.Module):
         out = self.base_model(x)
         out = self.new_fc(out)
 
-        if self.cfg.is_shift and self.cfg.temporal_pool:
-            out = out.view((-1, self.cfg.num_seg // 2) + out.size()[1:])
+        if self.is_shift and self.temporal_pool:
+            out = out.view((-1, self.num_seg // 2) + out.size()[1:])
         else:
-            out = out.view((-1, self.cfg.num_seg) + out.size()[1:])
+            out = out.view((-1, self.num_seg) + out.size()[1:])
 
-        if self.cfg.consensus_type == 'avg':
+        if self.consensus_type == 'avg':
             out = out.mean(dim=1)
         return out.squeeze(1)
 

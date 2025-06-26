@@ -1,6 +1,5 @@
 import ast
 from copy import deepcopy
-from omegaconf import OmegaConf
 
 import torch
 import torch.nn as nn
@@ -8,11 +7,10 @@ import torch.nn as nn
 from . import CUSTOM_MODULES
 
 
-class Model(nn.Module):
+class BaseModel(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        self.yaml = OmegaConf.load(cfg)
-        self.model, self.save = parse_model(deepcopy(self.yaml))
+        self.model, self.save = parse_model(deepcopy(cfg))
 
 
 def parse_model(model_dict):

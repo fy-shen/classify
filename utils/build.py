@@ -62,12 +62,12 @@ class Builder:
                 ckpt = ckpt.get("state_dict", ckpt)
                 sd = {}
                 for k, v in ckpt.items():
-                    if 'fc' not in k:
-                        if k.startswith('module.'):
-                            sd[k[len('module.'):]] = v
-                        else:
-                            sd[k] = v
-                model.load_state_dict(sd, strict=False)
+                    if k.startswith('module.'):
+                        sd[k[len('module.'):]] = v
+                    else:
+                        sd[k] = v
+                missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
+                self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
             return model
         else:
             raise ValueError(f"Model {name} is not supported.")
