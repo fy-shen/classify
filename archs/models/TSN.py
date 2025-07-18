@@ -58,8 +58,8 @@ class TSN(nn.Module):
                     count += 1
                     if count >= (1 if self.freeze_first_bn else 2):
                         m.eval()
-                        m.weight.requires_grad = False
-                        m.bias.requires_grad = False
+                        # m.weight.requires_grad = False
+                        # m.bias.requires_grad = False
 
     def forward(self, x):
         b, t, c, h, w = x.shape
