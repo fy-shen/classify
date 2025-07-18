@@ -43,10 +43,24 @@ def deadball_tsm_rgb(cfg, is_train):
             v2.Resize(cfg.input_size, antialias=True),
             v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0),
             v2.RandomHorizontalFlip(),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.2023, 0.1994, 0.2010]
+            ),
+            StackImageList()
         ])
     else:
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.2023, 0.1994, 0.2010]
+            ),
+            StackImageList()
         ])
 
 

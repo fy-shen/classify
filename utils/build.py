@@ -56,16 +56,18 @@ class Builder:
             if model_cfg is None:
                 raise ValueError(f"Custom model '{name}' requires `model_cfg` to be specified in config.")
             model = CUSTOM_SET['model'][name.lower()](OmegaConf.load(model_cfg))
+            model_state = model.state_dict()
             # TODO: pretrain
             if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
                 ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
                 ckpt = ckpt.get("state_dict", ckpt)
                 sd = {}
                 for k, v in ckpt.items():
-                    if k.startswith('module.'):
-                        sd[k[len('module.'):]] = v
-                    else:
-                        sd[k] = v
+                    k = k[len('module.'):] if k.startswith('module.') else k
+                    if 'fc' in k and k in model_state and v.shape != model_state[k].shape:
+                        continue
+
+                    sd[k] = v
                 missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
                 self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
             return model

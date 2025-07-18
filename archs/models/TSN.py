@@ -9,21 +9,19 @@ from archs.modules.conv import TemporalShiftBlock, NonLocal3DWrapper
 class TSN(nn.Module):
     def __init__(self, cfg):
         super(TSN, self).__init__()
-        self.cfg = cfg
+        self.num_classes = cfg.num_classes
+        self.base_model_name = cfg.base_model.lower()
+        self.pretrained = cfg.get("pretrained", False)
+        self.consensus_type = cfg.consensus_type
 
-        self.num_classes = self.cfg.num_classes
-        self.base_model_name = self.cfg.base_model.lower()
-        self.pretrained = self.cfg.get("pretrained", False)
-        self.consensus_type = self.cfg.consensus_type
-
-        self.is_shift = self.cfg.is_shift
-        self.num_seg = self.cfg.num_seg
-        self.shift_div = self.cfg.shift_div
-        self.temporal_pool = self.cfg.temporal_pool
-        self.non_local = self.cfg.non_local
-        self.dropout = self.cfg.dropout
-        self.freeze_first_bn = self.cfg.freeze_first_bn
-        self.partial_bn = self.cfg.partial_bn
+        self.is_shift = cfg.is_shift
+        self.num_seg = cfg.num_seg
+        self.shift_div = cfg.shift_div
+        self.temporal_pool = cfg.temporal_pool
+        self.non_local = cfg.non_local
+        self.dropout = cfg.dropout
+        self.freeze_first_bn = cfg.freeze_first_bn
+        self.partial_bn = cfg.partial_bn
 
         self._build_base_model()
 

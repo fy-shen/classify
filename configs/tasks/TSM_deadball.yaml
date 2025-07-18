@@ -1,27 +1,27 @@
 model: TSN
 model_cfg: configs/models/TSM.yaml
-save_dir: checkpoints/Fight/TSM
+save_dir:
 
 num_classes: 2
 dataset: TSNDataset
-data_trans: fight_tsm_rgb
+data_trans: deadball_tsm_rgb
 modality: RGB
-num_workers: 8
-input_size: 224
+num_workers: 2
+input_size: 252
 data_params:
-  root_path: /media/sfy/disk1/dataset/Fight
-  train_list: fight_train.txt
-  val_list: fight_val.txt
-  image_tmpl: '{:05d}.jpg'
+  root_path: /app/Football/DeadBall
+  train_list: splits/deadball/train.txt
+  val_list: splits/deadball/val.txt
+  image_tmpl: '{:06d}.jpg'
   dense_sample: False
-  clip_len: 64
+  clip_len: 64  # dense 模式
   new_length: 1
   num_sample: 1
   twice_sample: False
 
 train:
   enable: True
-  pretrained: 'pretrain/TSM_kinetics_RGB_resnet50_shift8_blockres_avg_segment8_e50.pth'
+  pretrained: False
   optimizer: SGD
   optim_params:
     lr: 0.0005
@@ -35,7 +35,7 @@ train:
 
   loss: crossentropyloss
   epochs: 50
-  batchsize: 24
+  batchsize: 6
   resume: False
   resume_path:
 

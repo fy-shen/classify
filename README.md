@@ -14,6 +14,10 @@ pip install -r requirements.txt
 
 （1）[ResNet+cifar10](configs/examples/res_cifar10.yaml)
 
+```bash
+python run.py --cfg configs/examples/res_cifar10.yaml
+```
+
 配置文件支持使用 PyTorch API 名称构建模型、数据、优化器等（大小写不敏感）
 
  - [torch.optim](https://docs.pytorch.org/docs/2.7/optim.html)
