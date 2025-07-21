@@ -9,7 +9,8 @@ def main():
         train(cfg)
 
     if cfg.val.enable:
-        pass
+        from tools.val import val
+        val(cfg)
 
     if cfg.test.enable:
         pass

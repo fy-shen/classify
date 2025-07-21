@@ -1,6 +1,6 @@
 model: TSN
 model_cfg: configs/models/TSM.yaml
-save_dir:
+save_dir: checkpoints/DeadBall/TSM
 
 num_classes: 2
 dataset: TSNDataset

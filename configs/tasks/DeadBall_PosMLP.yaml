@@ -1,0 +1,47 @@
+model: PosMLP
+model_cfg: configs/models/PosMLP.yaml
+save_dir: checkpoints/DeadBall/PosMLP
+
+num_classes: 2
+num_seg: 8
+dataset: TSNDataset
+data_trans: deadball_posmlp_rgb
+modality: RGB
+num_workers: 4
+input_size: 252
+data_params:
+  root_path: /media/sfy/disk1/dataset/Fight
+  train_list: fight_train.txt
+  val_list: fight_val.txt
+  image_tmpl: '{:05d}.jpg'
+  dense_sample: False
+  clip_len: 64
+  new_length: 1
+  num_sample: 1
+  twice_sample: False
+
+train:
+  enable: True
+  pretrained: False
+  optimizer: AdamW
+  optim_params:
+    lr: 1e-4
+    betas: [0.9, 0.999]
+    weight_decay: 1e-8
+
+  scheduler: CosineAnnealingLR
+  scheduler_params:
+    T_max: 60
+    eta_min: 1e-6
+
+  loss: crossentropyloss
+  epochs: 60
+  batchsize: 4
+  resume: False
+  resume_path:
+
+val:
+  enable: False
+
+test:
+  enable: False

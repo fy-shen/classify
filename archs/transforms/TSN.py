@@ -36,32 +36,18 @@ class StackImageList(torch.nn.Module):
         return torch.stack(imgs, dim=0)
 
 
-@register('transform')
-def deadball_tsm_rgb(cfg, is_train):
-    if is_train:
-        return v2.Compose([
-            v2.Resize(cfg.input_size, antialias=True),
-            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0),
-            v2.RandomHorizontalFlip(),
-            ToImageList(),
-            ToDtypeList(torch.float32, scale=True),
-            NormalizeList(
-                mean=[0.4914, 0.4822, 0.4465],
-                std=[0.2023, 0.1994, 0.2010]
-            ),
-            StackImageList()
-        ])
-    else:
-        return v2.Compose([
-            v2.Resize(cfg.input_size, antialias=True),
-            ToImageList(),
-            ToDtypeList(torch.float32, scale=True),
-            NormalizeList(
-                mean=[0.4914, 0.4822, 0.4465],
-                std=[0.2023, 0.1994, 0.2010]
-            ),
-            StackImageList()
-        ])
+class PadToSquare(torch.nn.Module):
+    def forward(self, image):
+        h, w = v2F.get_dimensions(image)[1:]  # (C, H, W) format
+        diff = abs(h - w)
+        if h < w:
+            padding = [0, diff // 2, 0, diff - diff // 2]  # top, left, bottom, right
+        else:
+            padding = [diff // 2, 0, diff - diff // 2, 0]
+        return v2F.pad(image, padding, fill=0)  # padding 是 left, top, right, bottom
+
+    def __repr__(self):
+        return self.__class__.__name__ + '()'
 
 
 @register('transform')
@@ -84,6 +70,64 @@ def fight_tsm_rgb(cfg, is_train):
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),
             v2.CenterCrop(cfg.input_size),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.2023, 0.1994, 0.2010]
+            ),
+            StackImageList()
+        ])
+
+
+@register('transform')
+def deadball_tsm_rgb(cfg, is_train):
+    if is_train:
+        return v2.Compose([
+            v2.Resize(cfg.input_size, antialias=True),
+            PadToSquare(),
+            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0),
+            v2.RandomHorizontalFlip(),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.2023, 0.1994, 0.2010]
+            ),
+            StackImageList()
+        ])
+    else:
+        return v2.Compose([
+            v2.Resize(cfg.input_size, antialias=True),
+            PadToSquare(),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.2023, 0.1994, 0.2010]
+            ),
+            StackImageList()
+        ])
+
+
+@register('transform')
+def deadball_posmlp_rgb(cfg, is_train):
+    if is_train:
+        return v2.Compose([
+            v2.Resize(cfg.input_size, antialias=True),
+            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0),
+            v2.RandomHorizontalFlip(),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.2023, 0.1994, 0.2010]
+            ),
+            StackImageList()
+        ])
+    else:
+        return v2.Compose([
+            v2.Resize(cfg.input_size, antialias=True),
             ToImageList(),
             ToDtypeList(torch.float32, scale=True),
             NormalizeList(
