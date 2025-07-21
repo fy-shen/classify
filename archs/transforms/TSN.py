@@ -69,7 +69,6 @@ def fight_tsm_rgb(cfg, is_train):
     else:
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),
-            v2.CenterCrop(cfg.input_size),
             ToImageList(),
             ToDtypeList(torch.float32, scale=True),
             NormalizeList(
@@ -85,7 +84,6 @@ def deadball_tsm_rgb(cfg, is_train):
     if is_train:
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),
-            PadToSquare(),
             v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0),
             v2.RandomHorizontalFlip(),
             ToImageList(),
@@ -99,7 +97,6 @@ def deadball_tsm_rgb(cfg, is_train):
     else:
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),
-            PadToSquare(),
             ToImageList(),
             ToDtypeList(torch.float32, scale=True),
             NormalizeList(
@@ -123,7 +120,8 @@ def deadball_posmlp_rgb(cfg, is_train):
                 mean=[0.4914, 0.4822, 0.4465],
                 std=[0.2023, 0.1994, 0.2010]
             ),
-            StackImageList()
+            StackImageList(),
+            PadToSquare(),
         ])
     else:
         return v2.Compose([
@@ -134,5 +132,6 @@ def deadball_posmlp_rgb(cfg, is_train):
                 mean=[0.4914, 0.4822, 0.4465],
                 std=[0.2023, 0.1994, 0.2010]
             ),
-            StackImageList()
+            StackImageList(),
+            PadToSquare()
         ])
