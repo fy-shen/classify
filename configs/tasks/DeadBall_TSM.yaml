@@ -41,6 +41,8 @@ train:
 
 val:
   enable: False
+  weight: checkpoints/DeadBall/TSM/best.pth
+  batchsize: 6
 
 test:
   enable: False

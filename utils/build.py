@@ -19,7 +19,7 @@ class Builder:
         self.logger = logger
         self.weights = None
 
-    def build_model(self):
+    def build_model(self, is_train=True):
         name = self.cfg.model
         pretrained = self.cfg.train.get("pretrained", False)
         obj = get_torch_obj(name, [models])
@@ -59,17 +59,22 @@ class Builder:
             model_state = model.state_dict()
             # TODO: pretrain
             if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
-                ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
-                ckpt = ckpt.get("state_dict", ckpt)
-                sd = {}
-                for k, v in ckpt.items():
-                    k = k[len('module.'):] if k.startswith('module.') else k
-                    if 'fc' in k and k in model_state and v.shape != model_state[k].shape:
-                        continue
-
-                    sd[k] = v
-                missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
-                self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+                if is_train:
+                    ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
+                    ckpt = ckpt.get("state_dict", ckpt)
+                    sd = {}
+                    for k, v in ckpt.items():
+                        k = k[len('module.'):] if k.startswith('module.') else k
+                        if 'fc' in k and k in model_state and v.shape != model_state[k].shape:
+                            continue
+                        sd[k] = v
+                    missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
+                    self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+                else:
+                    ckpt = torch.load(self.cfg.val.weight, map_location="cpu")
+                    ckpt = ckpt.get("model", ckpt)
+                    missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=False)
+                    self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
             return model
         else:
             raise ValueError(f"Model {name} is not supported.")

@@ -19,7 +19,7 @@ def val_worker(rank, cfg):
     gpu_id = cfg.GPU_IDS[rank]
 
     builder = Builder(cfg, gpu_id, logger)
-    model = builder.build_model().to(gpu_id)
+    model = builder.build_model(False).to(gpu_id)
     if cfg.GPU_NUM > 1:
         setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
         model = DDP(model, device_ids=[gpu_id])
@@ -32,7 +32,7 @@ def val_worker(rank, cfg):
         sampler = None
     loader_val = DataLoader(
         dataset,
-        batch_size=cfg.train.batchsize,
+        batch_size=cfg.val.batchsize,
         num_workers=cfg.num_workers,
         pin_memory=True,
         sampler=sampler,
