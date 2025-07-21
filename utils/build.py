@@ -58,8 +58,8 @@ class Builder:
             model = CUSTOM_SET['model'][name.lower()](OmegaConf.load(model_cfg))
             model_state = model.state_dict()
             # TODO: pretrain
-            if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
-                if is_train:
+            if is_train:
+                if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
                     ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
                     ckpt = ckpt.get("state_dict", ckpt)
                     sd = {}
@@ -70,11 +70,11 @@ class Builder:
                         sd[k] = v
                     missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
                     self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
-                else:
-                    ckpt = torch.load(self.cfg.val.weight, map_location="cpu")
-                    ckpt = ckpt.get("model", ckpt)
-                    missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=False)
-                    self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+            else:
+                ckpt = torch.load(self.cfg.val.weight, map_location="cpu")
+                ckpt = ckpt.get("model", ckpt)
+                missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=False)
+                self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
             return model
         else:
             raise ValueError(f"Model {name} is not supported.")
