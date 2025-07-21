@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 
 import torch
 
+from utils.distributed import rank_zero
+
 
 def set_random_seed(seed: int, deterministic: bool = False):
     """
@@ -57,7 +59,7 @@ class Logger:
         return f"{title:{fill}^{width}}"
 
     def log(self, msg, print_out=True):
-        if print_out:
+        if print_out and rank_zero():
             # tqdm.write(msg)
             print(msg)
         with open(self.log_path, "a") as f:
