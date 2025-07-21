@@ -10,9 +10,9 @@ modality: RGB
 num_workers: 4
 input_size: 252
 data_params:
-  root_path: /media/sfy/disk1/dataset/Fight
-  train_list: fight_train.txt
-  val_list: fight_val.txt
+  root_path: /app/Football/DeadBall
+  train_list: splits/deadball/train.txt
+  val_list: splits/deadball/val.txt
   image_tmpl: '{:05d}.jpg'
   dense_sample: False
   clip_len: 64
