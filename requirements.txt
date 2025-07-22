@@ -7,7 +7,7 @@ matplotlib
 pillow
 prettytable
 
-torch==2.7.0+cu118
-torchvision==0.22.0+cu118
-torchaudio==2.7.0+cu118
--f https://download.pytorch.org/whl/torch_stable.html
+#torch==2.7.0+cu118
+#torchvision==0.22.0+cu118
+#torchaudio==2.7.0+cu118
+#-f https://download.pytorch.org/whl/torch_stable.html
