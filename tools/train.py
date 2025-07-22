@@ -22,6 +22,7 @@ def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, 
     pbar = tqdm(loader, desc=desc, ncols=100) if rank_zero() else loader
     with torch.set_grad_enabled(is_train):
         for step, (inputs, targets) in enumerate(pbar):
+            # print(inputs.shape)
             inputs = inputs.to(gpu_id, non_blocking=True)
             targets = targets.to(gpu_id, non_blocking=True)
 

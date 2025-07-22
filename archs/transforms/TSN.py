@@ -38,16 +38,30 @@ class StackImageList(torch.nn.Module):
 
 class PadToSquare(torch.nn.Module):
     def forward(self, image):
-        h, w = v2F.get_dimensions(image)[1:]  # (C, H, W) format
+        h, w = v2F.get_dimensions(image)[1:]  # (C, H, W)
         diff = abs(h - w)
         if h < w:
-            padding = [0, diff // 2, 0, diff - diff // 2]  # top, left, bottom, right
+            padding = [0, diff // 2, 0, diff - diff // 2]  # left, top, right, bottom
         else:
             padding = [diff // 2, 0, diff - diff // 2, 0]
-        return v2F.pad(image, padding, fill=0)  # padding 是 left, top, right, bottom
+        return v2F.pad(image, padding, fill=0)
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
+
+
+class PadToSize(torch.nn.Module):
+    def __init__(self, size):
+        super().__init__()
+        self.h, self.w = size
+
+    def forward(self, image, size):
+        h, w = v2F.get_dimensions(image)[1:]
+        self.h, self.w = size
+        h1 = (self.h - h) // 2
+        w1 = (self.w - w) // 2
+        padding = [w1, h1, self.w - w - w1, self.h - h - h1]
+        return v2F.pad(image, padding, fill=0)
 
 
 @register('transform')
@@ -121,7 +135,7 @@ def deadball_posmlp_rgb(cfg, is_train):
                 std=[0.2023, 0.1994, 0.2010]
             ),
             StackImageList(),
-            PadToSquare(),
+            PadToSize(cfg.pad_size)
         ])
     else:
         return v2.Compose([
@@ -133,5 +147,5 @@ def deadball_posmlp_rgb(cfg, is_train):
                 std=[0.2023, 0.1994, 0.2010]
             ),
             StackImageList(),
-            PadToSquare()
+            PadToSize(cfg.pad_size)
         ])

@@ -98,10 +98,10 @@ class PosMLPLayerT(nn.Module):
         chunks = chunks
         self.dim = dim
         self.norm = nn.LayerNorm(dim)
-        self.gate_unit = PosGUT(win_size, dim, chunks, gamma)
         self.act = act_layer()
-        self.fc2 = nn.Linear(dim, dim)
         self.fc1 = nn.Linear(dim, dim * 2)
+        self.gate_unit = PosGUT(win_size, dim, chunks, gamma)
+        self.fc2 = nn.Linear(dim, dim)
         self.drop = nn.Dropout(drop)
 
     def forward(self, x):

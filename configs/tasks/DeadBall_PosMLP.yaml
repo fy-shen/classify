@@ -8,7 +8,8 @@ dataset: TSNDataset
 data_trans: deadball_posmlp_rgb
 modality: RGB
 num_workers: 4
-input_size: 252
+input_size: (252, 896)
+pad_size: (448, 896)
 data_params:
   root_path: /app/Football/DeadBall
   train_list: splits/deadball/train.txt

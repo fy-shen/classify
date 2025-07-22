@@ -59,8 +59,9 @@ class Logger:
         return f"{title:{fill}^{width}}"
 
     def log(self, msg, print_out=True):
-        if print_out and rank_zero():
-            # tqdm.write(msg)
+        if not rank_zero():
+            return
+        if print_out:
             print(msg)
         with open(self.log_path, "a") as f:
             f.write(msg + "\n")
