@@ -50,17 +50,17 @@ class PadToSquare(torch.nn.Module):
         return self.__class__.__name__ + '()'
 
 
-class PadToSize(torch.nn.Module):
+class PadImageList(torch.nn.Module):
     def __init__(self, size):
         super().__init__()
         self.h, self.w = size
 
-    def forward(self, image):
-        h, w = v2F.get_dimensions(image)[1:]
+    def forward(self, images):
+        h, w = v2F.get_dimensions(images[0])[1:]
         h1 = (self.h - h) // 2
         w1 = (self.w - w) // 2
         padding = [w1, h1, self.w - w - w1, self.h - h - h1]
-        return v2F.pad(image, padding, fill=0)
+        return [v2F.pad(image, padding, fill=0) for image in images]
 
 
 @register('transform')
@@ -129,22 +129,22 @@ def deadball_posmlp_rgb(cfg, is_train):
             v2.RandomHorizontalFlip(),
             ToImageList(),
             ToDtypeList(torch.float32, scale=True),
+            PadImageList(cfg.pad_size),
             NormalizeList(
                 mean=[0.4914, 0.4822, 0.4465],
                 std=[0.2023, 0.1994, 0.2010]
             ),
             StackImageList(),
-            PadToSize(cfg.pad_size)
         ])
     else:
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),
             ToImageList(),
             ToDtypeList(torch.float32, scale=True),
+            PadImageList(cfg.pad_size),
             NormalizeList(
                 mean=[0.4914, 0.4822, 0.4465],
                 std=[0.2023, 0.1994, 0.2010]
             ),
             StackImageList(),
-            PadToSize(cfg.pad_size)
         ])
