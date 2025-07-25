@@ -50,5 +50,5 @@ test:
   code: video_deadball
   weight: checkpoints/DeadBall/TSM/best.pth
   frame_stride: 11
-  video_path:
-  label_path:
+  video_path: videos
+  label_path: arrays
