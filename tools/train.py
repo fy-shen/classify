@@ -67,8 +67,8 @@ def train_worker(rank, cfg):
 
     start_time = time.time()
 
-    builder = Builder(cfg, gpu_id, logger)
-    model = builder.build_model().to(gpu_id)
+    builder = Builder(cfg, logger)
+    model = builder.build_model('train').to(gpu_id)
     if cfg.GPU_NUM > 1:
         setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
         model = DDP(model, device_ids=[gpu_id])

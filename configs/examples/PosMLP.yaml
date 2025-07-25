@@ -5,10 +5,11 @@ save_dir:
 num_classes: 2
 num_seg: 8
 dataset: TSNDataset
-data_trans: fight_tsm_rgb
+data_trans: deadball_posmlp_rgb
 modality: RGB
 num_workers: 8
-input_size: 224
+input_size: 160
+pad_size: [224, 448]
 data_params:
   root_path: /media/sfy/disk1/dataset/Fight
   train_list: fight_train.txt
@@ -31,12 +32,12 @@ train:
 
   scheduler: CosineAnnealingLR
   scheduler_params:
-    T_max: 100
+    T_max: 60
     eta_min: 1e-6
 
   loss: crossentropyloss
-  epochs: 100
-  batchsize: 16
+  epochs: 60
+  batchsize: 8
   resume: False
   resume_path:
 

@@ -12,6 +12,7 @@ data_params:
   root_path: /app/Football/DeadBall
   train_list: splits/deadball/train.txt
   val_list: splits/deadball/val.txt
+  class_map: splits/deadball/classInd.txt
   image_tmpl: '{:06d}.jpg'
   dense_sample: False
   clip_len: 64  # dense 模式
@@ -46,3 +47,8 @@ val:
 
 test:
   enable: False
+  code: video_deadball
+  weight: checkpoints/DeadBall/TSM/best.pth
+  frame_stride: 11
+  video_path:
+  label_path:

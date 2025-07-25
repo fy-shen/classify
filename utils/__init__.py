@@ -1,5 +1,7 @@
 import os
 import random
+import cv2
+import logging
 import numpy as np
 from omegaconf import OmegaConf
 from prettytable import PrettyTable
@@ -11,6 +13,20 @@ import matplotlib.pyplot as plt
 import torch
 
 from utils.distributed import rank_zero
+
+
+class Video:
+    def __init__(self, video_path):
+        self.video_path = video_path
+
+        self.cap = cv2.VideoCapture(video_path)
+        if not self.cap.isOpened():
+            logging.warning(f'Open Video {video_path} failed')
+
+        self.w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.fps = int(self.cap.get(cv2.CAP_PROP_FPS))
 
 
 def set_random_seed(seed: int, deterministic: bool = False):

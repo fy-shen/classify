@@ -82,6 +82,7 @@ def fight_tsm_rgb(cfg, is_train):
     else:
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),
+            v2.CenterCrop(cfg.input_size),
             ToImageList(),
             ToDtypeList(torch.float32, scale=True),
             NormalizeList(

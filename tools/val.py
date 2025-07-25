@@ -18,8 +18,8 @@ def val_worker(rank, cfg):
     set_random_seed(cfg.SEED, cfg.DETERMINISTIC)
     gpu_id = cfg.GPU_IDS[rank]
 
-    builder = Builder(cfg, gpu_id, logger)
-    model = builder.build_model(False).to(gpu_id)
+    builder = Builder(cfg, logger)
+    model = builder.build_model('val').to(gpu_id)
     if cfg.GPU_NUM > 1:
         setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
         model = DDP(model, device_ids=[gpu_id])

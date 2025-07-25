@@ -13,13 +13,12 @@ from archs import CUSTOM_SET, get_torch_obj
 
 
 class Builder:
-    def __init__(self, cfg, gpu_id, logger):
+    def __init__(self, cfg, logger):
         self.cfg = cfg
-        self.gpu_id = gpu_id
         self.logger = logger
         self.weights = None
 
-    def build_model(self, is_train=True):
+    def build_model(self, mode):
         name = self.cfg.model
         pretrained = self.cfg.train.get("pretrained", False)
         obj = get_torch_obj(name, [models])
@@ -58,7 +57,7 @@ class Builder:
             model = CUSTOM_SET['model'][name.lower()](OmegaConf.load(model_cfg))
             model_state = model.state_dict()
             # TODO: pretrain
-            if is_train:
+            if mode == 'train':
                 if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
                     ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
                     ckpt = ckpt.get("state_dict", ckpt)
@@ -70,11 +69,18 @@ class Builder:
                         sd[k] = v
                     missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
                     self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
-            else:
+            elif mode == 'val':
                 ckpt = torch.load(self.cfg.val.weight, map_location="cpu")
                 ckpt = ckpt.get("model", ckpt)
                 missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=False)
                 self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+            elif mode == 'test':
+                ckpt = torch.load(self.cfg.test.weight, map_location="cpu")
+                ckpt = ckpt.get("model", ckpt)
+                missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=False)
+                self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+            else:
+                raise ValueError(f"Build Model Mode {name} is not supported.")
             return model
         else:
             raise ValueError(f"Model {name} is not supported.")
