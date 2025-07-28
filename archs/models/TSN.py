@@ -73,7 +73,7 @@ class TSN(nn.Module):
             out = out.view((-1, self.num_seg) + out.size()[1:])
 
         if self.consensus_type == 'avg':
-            out = out.mean(dim=1)
+            out = out.mean(dim=1, keepdim=True)
         return out.squeeze(1)
 
 

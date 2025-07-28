@@ -18,7 +18,8 @@ green = (0, 255, 0)
 red = (0, 0, 255)
 
 
-def video_infer(gpu_id, video_file, label_file, model, trans, label_map, cfg):
+def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger, cfg):
+    target_names = [label_map[i] for i in range(len(label_map))]
     video = Video(video_file)
     result_path = os.path.join(cfg.save_dir, os.path.basename(video_file))
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')
@@ -75,12 +76,34 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, cfg):
 
         writer.release()
         if use_label:
-            from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+            from sklearn.metrics import (
+                confusion_matrix, ConfusionMatrixDisplay,
+                classification_report, precision_recall_fscore_support
+            )
             import matplotlib.pyplot as plt
 
-            cm = confusion_matrix(label_all, pred_all)
-            disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_map)
-            disp.plot(include_values=True, cmap='Blues', xticks_rotation='vertical')
+            filtered_labels = []
+            filtered_preds = []
+            for label, pred in zip(label_all, pred_all):
+                if label != -1:
+                    filtered_labels.append(label)
+                    filtered_preds.append(pred)
+
+            report = classification_report(filtered_labels, filtered_preds, target_names=target_names, digits=3)
+            logger.log(logger.make_separator(os.path.split(video_file)[-1]))
+            logger.log(report)
+            precision, recall, f1, support = precision_recall_fscore_support(
+                filtered_labels, filtered_preds, labels=list(range(len(target_names)))
+            )
+            logger.log(f"{'Class':<15}{'TP':<8}{'FP':<8}{'P':<8}{'R':<8}{'F1':<8}{'Support'}")
+
+            cm = confusion_matrix(filtered_labels, filtered_preds, labels=list(range(len(target_names))))
+            for i, name in enumerate(target_names):
+                tp = cm[i, i]
+                fp = cm[:, i].sum() - tp
+                logger.log(f"{name:<15}{tp:<8}{fp:<8}{precision[i]:<8.3f}{recall[i]:<8.3f}{f1[i]:<8.3f}{support[i]}")
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=target_names)
+            disp.plot(include_values=True, cmap='Blues', xticks_rotation='horizontal')
             plt.title("Confusion Matrix")
             plt.savefig(os.path.join(cfg.save_dir, f'{splitfn(video_file)[1]}_confusion_matrix.png'))
             plt.close()
@@ -107,12 +130,12 @@ def main(cfg):
             video_file = os.path.join(video_path, video_f)
             fn = splitfn(video_file)[1]
             label_file = os.path.join(label_path, fn + '.npz')
-            video_infer(gpu_id, video_file, label_file, model, trans, label_map, cfg)
+            video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger, cfg)
     elif os.path.isfile(video_path):
         video_file = video_path
         fn = splitfn(video_file)[1]
         label_file = os.path.join(label_path, fn + '.npz') if os.path.isdir(label_path) else label_path
-        video_infer(gpu_id, video_file, label_file, model, trans, label_map, cfg)
+        video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger, cfg)
     else:
         raise ValueError(f"{video_path} is not a valid file or directory.")
 

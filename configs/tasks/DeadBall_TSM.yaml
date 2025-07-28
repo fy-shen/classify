@@ -48,7 +48,7 @@ val:
 test:
   enable: False
   code: video_deadball
-  weight: checkpoints/DeadBall/TSM/best.pth
+  weight: /home/sfy/SFY/Code/classify/checkpoints/DeadBall/TSM/best.pth
   frame_stride: 11
-  video_path: videos
+  video_path: videos/20240811-180631-1.mp4
   label_path: arrays

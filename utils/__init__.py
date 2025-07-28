@@ -69,7 +69,7 @@ class Logger:
                 f.write(f"Training {cfg.model} on dataset {cfg.dataset}\n")
 
     @staticmethod
-    def make_separator(title, width=60, fill='='):
+    def make_separator(title="", width=60, fill='='):
         if title:
             title = f" {title} "
         return f"{title:{fill}^{width}}"
@@ -90,13 +90,13 @@ class Logger:
         if scheduler:
             msg += '\n' + self.make_separator("Scheduler") + '\n'
             msg += f"{type(scheduler).__name__} | Params: {cfg.train.get('scheduler_params', {})}"
-        msg += '\n' + self.make_separator("")
+        msg += '\n' + self.make_separator()
         self.log(msg)
 
     def log_cfg(self, cfg):
         msg = '\n' + self.make_separator("Config") + '\n'
         msg += OmegaConf.to_yaml(cfg, resolve=True)
-        msg += '\n' + self.make_separator("")
+        msg += '\n' + self.make_separator()
         self.log(msg)
 
     def log_pretrain_msg(self, missing_keys, unexpected_keys):
@@ -113,7 +113,7 @@ class Logger:
             t2.add_row([k])
         msg += t1.get_string()
         msg += '\n' + t2.get_string()
-        msg += '\n' + self.make_separator("")
+        msg += '\n' + self.make_separator()
         self.log(msg)
 
     def update_history(self, phase, metrics):
