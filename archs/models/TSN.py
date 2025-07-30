@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 import torchvision.models as models
 
@@ -9,6 +10,7 @@ from archs.modules.conv import TemporalShiftBlock, NonLocal3DWrapper
 class TSN(nn.Module):
     def __init__(self, cfg):
         super(TSN, self).__init__()
+        self.modality = cfg.modality
         self.num_classes = cfg.num_classes
         self.base_model_name = cfg.base_model.lower()
         self.pretrained = cfg.get("pretrained", False)
@@ -20,8 +22,10 @@ class TSN(nn.Module):
         self.temporal_pool = cfg.temporal_pool
         self.non_local = cfg.non_local
         self.dropout = cfg.dropout
+
         self.freeze_first_bn = cfg.freeze_first_bn
         self.partial_bn = cfg.partial_bn
+        self.fc_lr5 = cfg.fc_lr5
 
         self._build_base_model()
 
@@ -58,8 +62,82 @@ class TSN(nn.Module):
                     count += 1
                     if count >= (1 if self.freeze_first_bn else 2):
                         m.eval()
-                        # m.weight.requires_grad = False
-                        # m.bias.requires_grad = False
+                        m.weight.requires_grad = False
+                        m.bias.requires_grad = False
+
+    def get_optim_policies(self):
+        first_conv_weight = []
+        first_conv_bias = []
+        normal_weight = []
+        normal_bias = []
+        lr5_weight = []
+        lr10_bias = []
+        bn = []
+        custom_ops = []
+
+        conv_cnt = 0
+        bn_cnt = 0
+        for m in self.modules():
+            if isinstance(m, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+                ps = list(m.parameters())
+                conv_cnt += 1
+                if conv_cnt == 1:
+                    first_conv_weight.append(ps[0])
+                    if len(ps) == 2:
+                        first_conv_bias.append(ps[1])
+                else:
+                    normal_weight.append(ps[0])
+                    if len(ps) == 2:
+                        normal_bias.append(ps[1])
+            elif isinstance(m, nn.Linear):
+                ps = list(m.parameters())
+                lr5_weight.append(ps[0]) if self.fc_lr5 else normal_weight.append(ps[0])
+                if len(ps) == 2:
+                    lr10_bias.append(ps[1]) if self.fc_lr5 else normal_bias.append(ps[1])
+
+            elif isinstance(m, nn.BatchNorm2d):
+                bn_cnt += 1
+                # later BN's are frozen
+                if not self.partial_bn or bn_cnt == 1:
+                    bn.extend(list(m.parameters()))
+            elif isinstance(m, nn.BatchNorm3d):
+                bn_cnt += 1
+                # later BN's are frozen
+                if not self.partial_bn or bn_cnt == 1:
+                    bn.extend(list(m.parameters()))
+            elif len(m._modules) == 0:
+                if len(list(m.parameters())) > 0:
+                    raise ValueError("New atomic module type: {}. Need to give it a learning policy".format(type(m)))
+
+        return [
+            {'params': first_conv_weight, 'lr_mult': 5 if self.modality == 'Flow' else 1, 'decay_mult': 1,
+             'name': "first_conv_weight"},
+            {'params': first_conv_bias, 'lr_mult': 10 if self.modality == 'Flow' else 2, 'decay_mult': 0,
+             'name': "first_conv_bias"},
+            {'params': normal_weight, 'lr_mult': 1, 'decay_mult': 1,
+             'name': "normal_weight"},
+            {'params': normal_bias, 'lr_mult': 2, 'decay_mult': 0,
+             'name': "normal_bias"},
+            {'params': bn, 'lr_mult': 1, 'decay_mult': 0,
+             'name': "BN scale/shift"},
+            {'params': custom_ops, 'lr_mult': 1, 'decay_mult': 1,
+             'name': "custom_ops"},
+            # for fc
+            {'params': lr5_weight, 'lr_mult': 5, 'decay_mult': 1,
+             'name': "lr5_weight"},
+            {'params': lr10_bias, 'lr_mult': 10, 'decay_mult': 0,
+             'name': "lr10_bias"},
+        ]
+
+    def get_state_dict(self, weight_path):
+        ckpt = torch.load(weight_path, weights_only=False)
+        ckpt = ckpt.get("state_dict", ckpt)
+        ckpt = ckpt.get("model", ckpt)
+        sd = {}
+        for k, v in ckpt.items():
+            k = k[len('module.'):] if k.startswith('module.') else k
+            sd[k] = v
+        return sd
 
     def forward(self, x):
         b, t, c, h, w = x.shape

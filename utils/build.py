@@ -18,6 +18,12 @@ class Builder:
         self.logger = logger
         self.weights = None
 
+    def load_weights(self, model, weight_path):
+        state_dict = model.get_state_dict(weight_path) if hasattr(model, 'get_state_dict') else \
+            torch.load(weight_path, weights_only=False)
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+
     def build_model(self, mode):
         name = self.cfg.model
         pretrained = self.cfg.train.get("pretrained", False)
@@ -55,30 +61,18 @@ class Builder:
             if model_cfg is None:
                 raise ValueError(f"Custom model '{name}' requires `model_cfg` to be specified in config.")
             model = CUSTOM_SET['model'][name.lower()](OmegaConf.load(model_cfg))
-            model_state = model.state_dict()
+
             # TODO: pretrain
             if mode == 'train':
                 if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
-                    ckpt = torch.load(self.cfg.train.pretrained, map_location="cpu")
-                    ckpt = ckpt.get("state_dict", ckpt)
-                    sd = {}
-                    for k, v in ckpt.items():
-                        k = k[len('module.'):] if k.startswith('module.') else k
-                        if 'fc' in k and k in model_state and v.shape != model_state[k].shape:
-                            continue
-                        sd[k] = v
-                    missing_keys, unexpected_keys = model.load_state_dict(sd, strict=False)
-                    self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+                    weight_path = self.cfg.train.pretrained
+                    self.load_weights(model, weight_path)
             elif mode == 'val':
-                ckpt = torch.load(self.cfg.val.weight, map_location="cpu")
-                ckpt = ckpt.get("model", ckpt)
-                missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=False)
-                self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+                weight_path = self.cfg.val.weight
+                self.load_weights(model, weight_path)
             elif mode == 'test':
-                ckpt = torch.load(self.cfg.test.weight, map_location="cpu")
-                ckpt = ckpt.get("model", ckpt)
-                missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=False)
-                self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+                weight_path = self.cfg.test.weight
+                self.load_weights(model, weight_path)
             else:
                 raise ValueError(f"Build Model Mode {name} is not supported.")
             return model
@@ -101,7 +95,8 @@ class Builder:
         obj = get_torch_obj(name, [optim])
         if obj:
             args = OmegaConf.to_container(self.cfg.train.get("optim_params", {}), resolve=True)
-            return obj(model.parameters(), **args)
+            policies = model.get_optim_policies() if hasattr(model, 'get_optim_policies') else model.parameters()
+            return obj(policies, **args)
         else:
             raise ValueError(f"Optimizer {name} is not supported.")
 

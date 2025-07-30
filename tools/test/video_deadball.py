@@ -61,12 +61,12 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
                         text = f'{label_map[clsid]}: {conf:.2f}'
                         # 推理预测对应类别红色，其余类别蓝色
                         color = red if pred == clsid else blue
-                        cv2.putText(frame, text, (1920, 50 * (clsid + 1)), cv2.FONT_HERSHEY_TRIPLEX,
+                        cv2.putText(frame, text, (video.w//2, 50 * (clsid + 1)), cv2.FONT_HERSHEY_TRIPLEX,
                                     2, color, 1, cv2.LINE_AA, bottomLeftOrigin=False)
                         if use_label:
                             # 标签类别前画一个绿点
                             if labels_raw[idx] == clsid:
-                                cv2.circle(frame, (1920 - 25, 30 + clsid * 50), 10, green,
+                                cv2.circle(frame, (video.w//2 - 25, 30 + clsid * 50), 10, green,
                                            thickness=-1, lineType=cv2.LINE_AA)
                     writer.write(frame)
                     if use_label:
