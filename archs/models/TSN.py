@@ -136,7 +136,8 @@ class TSN(nn.Module):
         sd = {}
         for k, v in ckpt.items():
             k = k[len('module.'):] if k.startswith('module.') else k
-            sd[k] = v
+            if "fc" not in k:
+                sd[k] = v
         return sd
 
     def forward(self, x):
