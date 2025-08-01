@@ -50,5 +50,5 @@ test:
   code: video_deadball
   weight: /home/sfy/SFY/Code/classify/checkpoints/DeadBall/TSM/best.pth
   frame_stride: 11
-  video_path: videos/20240811-180631-1.mp4
+  video_path: videos/20240908-145913.mp4
   label_path: arrays

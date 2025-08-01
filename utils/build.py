@@ -18,9 +18,10 @@ class Builder:
         self.logger = logger
         self.weights = None
 
-    def load_weights(self, model, weight_path):
-        state_dict = model.get_state_dict(weight_path) if hasattr(model, 'get_state_dict') else \
+    def load_weights(self, model, weight_path, is_train=False):
+        state_dict = model.get_state_dict(weight_path, is_train) if hasattr(model, 'get_state_dict') else \
             torch.load(weight_path, weights_only=False)
+
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
 
@@ -66,7 +67,7 @@ class Builder:
             if mode == 'train':
                 if self.cfg.train.pretrained and Path(self.cfg.train.pretrained).is_file():
                     weight_path = self.cfg.train.pretrained
-                    self.load_weights(model, weight_path)
+                    self.load_weights(model, weight_path, True)
             elif mode == 'val':
                 weight_path = self.cfg.val.weight
                 self.load_weights(model, weight_path)

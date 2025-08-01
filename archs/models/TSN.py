@@ -129,7 +129,7 @@ class TSN(nn.Module):
              'name': "lr10_bias"},
         ]
 
-    def get_state_dict(self, weight_path):
+    def get_state_dict(self, weight_path, is_train):
         ckpt = torch.load(weight_path, weights_only=False)
         ckpt = ckpt.get("state_dict", ckpt)
         ckpt = ckpt.get("model", ckpt)
@@ -138,6 +138,9 @@ class TSN(nn.Module):
             k = k[len('module.'):] if k.startswith('module.') else k
             if "fc" not in k:
                 sd[k] = v
+            else:
+                if not is_train:
+                    sd[k] = v
         return sd
 
     def forward(self, x):
