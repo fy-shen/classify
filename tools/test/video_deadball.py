@@ -26,11 +26,11 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
     writer = cv2.VideoWriter(result_path, fourcc, video.fps, (video.w, video.h))
 
     if os.path.exists(label_file):
-        label = np.load(label_file)['label']
+        labels = np.load(label_file)['label']
         use_label = True
-        video_len = min(video.frames, len(label))
+        video_len = min(video.frames, len(labels))
     else:
-        label = None
+        labels = None
         use_label = False
         video_len = video.frames
 
@@ -44,18 +44,21 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
                 break
             frames_raw.append(frame_raw)
             if use_label:
-                labels_raw.append(label[i])
+                labels_raw.append(labels[i])
             if i % cfg.test.frame_stride == 0:
                 image = Image.fromarray(cv2.cvtColor(frame_raw, cv2.COLOR_BGR2RGB))
                 inputs.append(image)
             if len(inputs) == model.num_seg:
                 # [T,C,H,W]
                 data = trans(inputs)
-                data = data.unsqueeze(0).to(gpu_id)
+                data = data.unsqueeze(0).to(gpu_id, non_blocking=True)
                 output = model(data)
                 confs = F.softmax(output, dim=1)[0]
                 pred = torch.argmax(confs).item()
                 for idx in range(len(frames_raw)):
+                    if use_label:
+                        pred_all.append(pred)
+                        label_all.append(labels_raw[idx])
                     frame = frames_raw[idx]
                     for clsid, conf in enumerate(confs):
                         text = f'{label_map[clsid]}: {conf:.2f}'
@@ -69,9 +72,7 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
                                 cv2.circle(frame, (video.w//2 - 25, 30 + clsid * 50), 10, green,
                                            thickness=-1, lineType=cv2.LINE_AA)
                     writer.write(frame)
-                    if use_label:
-                        pred_all.append(pred)
-                        label_all.append(labels_raw[idx])
+
                 frames_raw.clear(), labels_raw.clear(), inputs.clear()
 
         writer.release()
@@ -84,9 +85,9 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
 
             filtered_labels = []
             filtered_preds = []
-            for label, pred in zip(label_all, pred_all):
-                if label != -1:
-                    filtered_labels.append(label)
+            for gt, pred in zip(label_all, pred_all):
+                if gt != -1:
+                    filtered_labels.append(gt)
                     filtered_preds.append(pred)
 
             report = classification_report(filtered_labels, filtered_preds, target_names=target_names, digits=3)
@@ -117,6 +118,7 @@ def main(cfg):
 
     builder = Builder(cfg, logger)
     model = builder.build_model('test').to(gpu_id)
+    model.eval()
     if cfg.GPU_NUM > 1:
         model = nn.DataParallel(model, device_ids=cfg.GPU_IDS)
 

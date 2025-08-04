@@ -36,19 +36,19 @@ train:
 
   loss: crossentropyloss
   epochs: 50
-  batchsize: 6
+  batchsize: 4
   resume: False
   resume_path:
 
 val:
   enable: False
-  weight: checkpoints/DeadBall/TSM/best.pth
-  batchsize: 6
+  weight: checkpoints/DeadBall/TSM_0731/best.pth
+  batchsize: 16
 
 test:
   enable: False
   code: video_deadball
-  weight: /home/sfy/SFY/Code/classify/checkpoints/DeadBall/TSM/best.pth
+  weight: checkpoints/DeadBall/TSM_0731/best.pth
   frame_stride: 11
-  video_path: videos/20240908-145913.mp4
+  video_path: videos
   label_path: arrays

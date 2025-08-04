@@ -1,5 +1,5 @@
 model: TSN
-model_cfg: configs/models/TSM.yaml
+model_cfg: configs/models/DeadBall_TSM.yaml
 save_dir: checkpoints/Fight/TSM
 
 num_classes: 2
