@@ -1,6 +1,6 @@
 model: TSN
 model_cfg: configs/models/HighLight_TSM.yaml
-save_dir: checkpoints/HighLight/TSM
+save_dir: checkpoints/HighLight/TSM_0806
 
 num_classes: 2
 dataset: TSNDataset
@@ -22,10 +22,10 @@ data_params:
 
 train:
   enable: True
-  pretrained: False
+  pretrained: ../TSM/pretrained/TSM_kinetics_RGB_resnet50_shift8_blockres_avg_segment8_e50.pth
   optimizer: SGD
   optim_params:
-    lr: 0.0005
+    lr: 0.001
     momentum: 0.9
     weight_decay: 5e-4
 
@@ -36,7 +36,7 @@ train:
 
   loss: crossentropyloss
   epochs: 50
-  batchsize: 2
+  batchsize: 4
   resume: False
   resume_path:
 

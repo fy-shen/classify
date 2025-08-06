@@ -6,7 +6,7 @@ pretrained: True
 consensus_type: avg
 
 is_shift: True
-num_seg: 20
+num_seg: 15
 shift_div: 8
 temporal_pool: False
 
