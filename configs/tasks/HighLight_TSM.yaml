@@ -25,7 +25,7 @@ train:
   pretrained: ../TSM/pretrained/TSM_kinetics_RGB_resnet50_shift8_blockres_avg_segment8_e50.pth
   optimizer: SGD
   optim_params:
-    lr: 0.001
+    lr: 0.0005
     momentum: 0.9
     weight_decay: 5e-4
 
@@ -35,6 +35,8 @@ train:
     gamma: 0.5
 
   loss: crossentropyloss
+  loss_params:
+    weight: [1.0, 2.0]
   epochs: 50
   batchsize: 4
   resume: False

@@ -86,7 +86,10 @@ class Builder:
         name = self.cfg.train.loss
         obj = get_torch_obj(name, [nn])
         if obj:
-            return obj()
+            args = OmegaConf.to_container(self.cfg.train.get("loss_params", {}), resolve=True)
+            if args.get("weight", None) is not None:
+                args["weight"] = torch.FloatTensor(args["weight"])
+            return obj(**args)
 
         # TODO: custom loss
         raise ValueError(f"Loss function {name} is not supported.")
