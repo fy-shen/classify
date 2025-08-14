@@ -68,6 +68,9 @@ def best_by_pr(y_true, y_score, save_path):
 
 
 def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger, cfg):
+    save_array_path = os.path.join(cfg.save_dir, 'arrays', f'{splitfn(video_file)[1]}.npy')
+    if os.path.exists(save_array_path):
+        return
     target_names = [label_map[i] for i in range(len(label_map))]
     video = Video(video_file)
     writer = None
@@ -96,8 +99,9 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
             frames_raw.append(frame_raw)
             if use_label:
                 labels_raw.append(labels[i])
-            if i % cfg.test.frame_stride == 0:
-                image = Image.fromarray(cv2.cvtColor(frame_raw, cv2.COLOR_BGR2RGB))
+            if len(frames_raw) % cfg.test.frame_stride == 0:
+                image_choice = frames_raw[len(frames_raw) - cfg.test.frame_stride // 2]
+                image = Image.fromarray(cv2.cvtColor(image_choice, cv2.COLOR_BGR2RGB))
                 inputs.append(image)
             if len(inputs) == model.num_seg:
                 # [T,C,H,W]
@@ -129,7 +133,7 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
                 frames_raw.clear(), labels_raw.clear(), inputs.clear()
 
         # save confs
-        np.save(os.path.join(cfg.save_dir, 'arrays', f'{splitfn(video_file)[1]}.npy'),
+        np.save(save_array_path,
                 np.asarray(conf_all),
                 allow_pickle=True)
 
@@ -179,9 +183,9 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
             pr_path = os.path.join(cfg.save_dir, f'{splitfn(video_file)[1]}_pr.png')
             auc_roc, thresh_roc, acc_roc = best_by_roc(y_true, y_score, roc_path)
             auc_pr, thresh_pr, acc_pr = best_by_pr(y_true, y_score, pr_path)
-            logger.log(f"\n{'Curve':<10}{'AUC':<8}{'BestThr':<12}{'ACC@Thr':<12}")
-            logger.log(f"{'ROC':<10}{auc_roc:<8.3f}{thresh_roc:<12.3f}{acc_roc:<12.3f}")
-            logger.log(f"{'PR':<10}{auc_pr:<8.3f}{thresh_pr:<12.3f}{acc_pr:<12.3f}")
+            logger.log(f"\n{'Curve':<10}{'AUC':<12}{'BestThr':<12}{'ACC@Thr':<12}")
+            logger.log(f"{'ROC':<10}{auc_roc:<12.3f}{thresh_roc:<12.3f}{acc_roc:<12.3f}")
+            logger.log(f"{'PR':<10}{auc_pr:<12.3f}{thresh_pr:<12.3f}{acc_pr:<12.3f}")
 
 
 def main(cfg):
