@@ -1,0 +1,17 @@
+modality: RGB
+num_classes: 2
+
+base_model: resnet50
+pretrained: True
+consensus_type: avg
+
+is_shift: True
+num_seg: 10
+shift_div: 8
+temporal_pool: False
+
+non_local: False
+dropout: 0.8
+freeze_first_bn: False
+partial_bn: True
+fc_lr5: False

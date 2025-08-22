@@ -17,12 +17,17 @@ def main():
         module_name = f"tools.test.{cfg.test.code}"
         try:
             mod = importlib.import_module(module_name)
-            mod.main(cfg)
         except ImportError:
             print(f"Module {module_name} not found.")
-        except AttributeError:
-            print(f"No main(cfg) function found in {module_name}.")
-        pass
+        else:
+            if not hasattr(mod, "main") or not callable(mod.main):
+                print(f"No main(cfg) function found in {module_name}.")
+            else:
+                try:
+                    mod.main(cfg)
+                except Exception as e:
+                    print(f"Error occurred while running main(cfg) in {module_name}: {type(e).__name__}: {e}")
+                    raise
 
 
 if __name__ == '__main__':

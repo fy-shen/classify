@@ -1,0 +1,56 @@
+model: TSN
+model_cfg: configs/models/SetPiece_TSM.yaml
+save_dir: checkpoints/SetPiece/TSM_0822
+
+num_classes: 2
+dataset: TSNDataset
+data_trans: deadball_tsm_rgb
+modality: RGB
+num_workers: 2
+input_size: 252
+data_params:
+  root_path: /app/Football/DeadBall
+  train_list: splits/SetPiece/train.txt
+  val_list: splits/SetPiece/val.txt
+  class_map: splits/SetPiece/classInd.txt
+  image_tmpl: '{:06d}.jpg'
+  dense_sample: False
+  clip_len: 64  # dense 模式
+  new_length: 1
+  num_sample: 1
+  twice_sample: False
+
+train:
+  enable: True
+  pretrained: ../TSM/pretrained/TSM_kinetics_RGB_resnet50_shift8_blockres_avg_segment8_e50.pth
+  optimizer: SGD
+  optim_params:
+    lr: 0.0005
+    momentum: 0.9
+    weight_decay: 5e-4
+
+  scheduler: StepLR
+  scheduler_params:
+    step_size: 10
+    gamma: 0.5
+
+  loss: crossentropyloss
+  loss_params:
+    weight: [1.0, 8.0]
+  epochs: 80
+  batchsize: 4
+  resume: False
+  resume_path:
+
+val:
+  enable: False
+  weight:
+  batchsize: 6
+
+test:
+  enable: False
+  code: video_deadball
+  weight:
+  frame_stride: 11
+  video_path: videos/20240811-180631-1.mp4
+  label_path: arrays
