@@ -24,7 +24,7 @@ def val_worker(rank, cfg):
         setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
         model = DDP(model, device_ids=[gpu_id])
 
-    criterion = builder.build_criterion()
+    criterion = builder.build_criterion().to(gpu_id)
     dataset = builder.build_dataset('val')
     if cfg.GPU_NUM > 1:
         sampler = DistributedSampler(dataset, num_replicas=cfg.GPU_NUM, rank=rank, shuffle=False, drop_last=False)

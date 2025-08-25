@@ -18,6 +18,9 @@ def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, 
     total_loss = torch.tensor(0.0, device=gpu_id)
     total_correct = torch.tensor(0, device=gpu_id)
     total_samples = torch.tensor(0, device=gpu_id)
+
+    all_preds, all_targets = [], []
+
     desc = f"[Train Epoch {epoch:>3d}]" if is_train else f"[Val]"
     pbar = tqdm(loader, desc=desc, ncols=100) if rank_zero() else loader
     with torch.set_grad_enabled(is_train):
@@ -40,6 +43,10 @@ def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, 
             _, preds = outputs.max(1)
             total_correct += preds.eq(targets).sum()
             total_samples += inputs.size(0)
+
+            if not is_train:
+                all_preds.append(preds.detach().cpu())
+                all_targets.append(targets.detach().cpu())
 
             if rank_zero():
                 avg_loss = total_loss / (total_samples + 1e-8)
