@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 
 from utils import set_random_seed, Logger
 from utils.build import Builder
-from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero, reduce_tensor
+from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero, reduce_tensor, gather_tensor
 
 
 def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, epoch=None, is_train=True):
@@ -19,7 +19,7 @@ def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, 
     total_correct = torch.tensor(0, device=gpu_id)
     total_samples = torch.tensor(0, device=gpu_id)
 
-    all_preds, all_targets = [], []
+    all_preds, all_targets, preds_tensor, targets_tensor = [], [], None, None
 
     desc = f"[Train Epoch {epoch:>3d}]" if is_train else f"[Val]"
     pbar = tqdm(loader, desc=desc, ncols=100) if rank_zero() else loader
@@ -63,7 +63,14 @@ def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, 
         if is_train and scheduler is not None:
             scheduler.step()
 
-        return avg_loss, avg_acc
+        if not is_train:
+            preds_tensor = torch.cat(all_preds)
+            targets_tensor = torch.cat(all_targets)
+
+            preds_tensor = gather_tensor(preds_tensor)
+            targets_tensor = gather_tensor(targets_tensor)
+
+        return avg_loss, avg_acc, preds_tensor, targets_tensor
 
 
 def train_worker(rank, cfg):
@@ -146,7 +153,7 @@ def train_worker(rank, cfg):
     for epoch in range(start_epoch, cfg.train.epochs):
         if sampler_train is not None:
             sampler_train.set_epoch(epoch)
-        train_loss, train_acc = run_epoch(
+        train_loss, train_acc, _, _ = run_epoch(
             model, loader_train, criterion, gpu_id, optimizer, scheduler, epoch, is_train=True
         )
         if rank_zero():
@@ -162,7 +169,9 @@ def train_worker(rank, cfg):
         }
         # evaluate every EVAL_PERIOD epochs
         if (epoch + 1) % cfg.EVAL_PERIOD == 0:
-            val_loss, val_acc = run_epoch(model, loader_val, criterion, gpu_id, is_train=False)
+            val_loss, val_acc, preds_tensor, targets_tensor = run_epoch(
+                model, loader_val, criterion, gpu_id, is_train=False
+            )
             logger.update_history('val', {'epoch': epoch, 'loss': val_loss, 'acc': val_acc})
             if rank_zero() and val_acc is not None:
                 ckpt["history"] = logger.history

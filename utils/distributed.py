@@ -55,3 +55,29 @@ def reduce_tensor(tensor, op=dist.ReduceOp.SUM):
         return rt
     else:
         return tensor
+
+
+def gather_tensor(tensor):
+    if dist.is_initialized():
+        world_size = dist.get_world_size()
+        # 先把每个 rank 的长度广播出来
+        local_size = torch.tensor([tensor.size(0)], device=tensor.device)
+        sizes = [torch.zeros(1, device=tensor.device, dtype=torch.long) for _ in range(world_size)]
+        dist.all_gather(sizes, local_size)
+        sizes = [int(s.item()) for s in sizes]
+
+        # pad 到最大长度
+        max_size = max(sizes)
+        padded = torch.zeros(max_size, dtype=tensor.dtype, device=tensor.device)
+        padded[:tensor.size(0)] = tensor
+
+        gathered = [torch.zeros(max_size, dtype=tensor.dtype, device=tensor.device) for _ in range(world_size)]
+        dist.all_gather(gathered, padded)
+
+        # 去掉 pad
+        result = []
+        for g, sz in zip(gathered, sizes):
+            result.append(g[:sz])
+        return torch.cat(result, dim=0)
+    else:
+        return tensor

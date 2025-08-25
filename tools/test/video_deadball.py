@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from utils import set_random_seed, Logger, Video
 from utils.build import Builder
 from utils.file import splitfn, load_label_map
+from utils.metrics import all_class_report
 
 
 blue = (255, 0, 0)
@@ -142,8 +143,8 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
 
         if use_label:
             from sklearn.metrics import (
-                confusion_matrix, ConfusionMatrixDisplay,
-                classification_report, precision_recall_fscore_support,
+                ConfusionMatrixDisplay,
+                classification_report
             )
 
             filtered_labels = []
@@ -161,15 +162,8 @@ def video_infer(gpu_id, video_file, label_file, model, trans, label_map, logger,
             logger.log(report)
 
             # 混淆矩阵
-            precision, recall, f1, support = precision_recall_fscore_support(
-                filtered_labels, filtered_preds, labels=list(range(len(target_names)))
-            )
-            logger.log(f"{'Class':<15}{'TP':<8}{'FP':<8}{'P':<8}{'R':<8}{'F1':<8}{'Support'}")
-            cm = confusion_matrix(filtered_labels, filtered_preds, labels=list(range(len(target_names))))
-            for i, name in enumerate(target_names):
-                tp = cm[i, i]
-                fp = cm[:, i].sum() - tp
-                logger.log(f"{name:<15}{tp:<8}{fp:<8}{precision[i]:<8.3f}{recall[i]:<8.3f}{f1[i]:<8.3f}{support[i]}")
+            cm = all_class_report(logger, filtered_preds, filtered_labels, len(target_names), target_names)
+
             disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=target_names)
             disp.plot(include_values=True, cmap='Blues', xticks_rotation='horizontal')
             plt.title("Confusion Matrix")
