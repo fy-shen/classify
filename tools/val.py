@@ -48,7 +48,7 @@ def val_worker(rank, cfg):
     loss, acc, preds_tensor, targets_tensor = run_epoch(model, loader_val, criterion, gpu_id, is_train=False)
     if rank_zero():
         logger.log(f'Val: Loss={loss:.3f}, Acc={acc:.2%}')
-        all_class_report(logger, preds_tensor.numpy(), targets_tensor.numpy(), len(target_names), target_names)
+        all_class_report(logger, preds_tensor.cpu().numpy(), targets_tensor.cpu().numpy(), len(target_names), target_names)
 
     if cfg.GPU_NUM > 1:
         cleanup_ddp()
