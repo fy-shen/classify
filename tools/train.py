@@ -45,8 +45,8 @@ def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, 
             total_samples += inputs.size(0)
 
             if not is_train:
-                all_preds.append(preds.detach().cpu())
-                all_targets.append(targets.detach().cpu())
+                all_preds.append(preds.detach())
+                all_targets.append(targets.detach())
 
             if rank_zero():
                 avg_loss = total_loss / (total_samples + 1e-8)
@@ -66,9 +66,9 @@ def run_epoch(model, loader, criterion, gpu_id, optimizer=None, scheduler=None, 
         if not is_train:
             preds_tensor = torch.cat(all_preds)
             targets_tensor = torch.cat(all_targets)
-
-            preds_tensor = gather_tensor(preds_tensor)
-            targets_tensor = gather_tensor(targets_tensor)
+            if rank_zero():
+                preds_tensor = gather_tensor(preds_tensor)
+                targets_tensor = gather_tensor(targets_tensor)
 
         return avg_loss, avg_acc, preds_tensor, targets_tensor
 
