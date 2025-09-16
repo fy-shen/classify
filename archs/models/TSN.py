@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 import torchvision.models as models
 
 from archs import register, get_torch_obj
@@ -193,3 +194,70 @@ def make_non_local(net, n_seg):
         NonLocal3DWrapper(net.layer3[4], n_seg),
         net.layer3[5],
     )
+
+
+@register('model')
+class TSMPoint(nn.Module):
+    def __init__(self):
+        super(TSMPoint, self).__init__()
+        self.num_seg = 5
+        self.num_div = 8
+        self.base_model = models.resnet50(weights='DEFAULT')
+        make_temporal_shift(
+            self.base_model, self.num_seg, self.num_div
+        )
+        in_features = self.base_model.fc.in_features
+        self.base_model = nn.Sequential(
+            *list(self.base_model.children())[:-2]
+        )
+
+        self.head = HeatmapHead(in_features)
+
+    def forward(self, x):
+        b, t, c, h, w = x.shape
+        x = x.view(-1, c, h, w)
+        feat = self.base_model(x)
+        feat = feat.view((-1, self.num_seg) + feat.size()[1:])
+        coords = self.head(feat)
+        return coords
+
+
+class HeatmapHead(nn.Module):
+    def __init__(self, in_channels):
+        super().__init__()
+        self.temporal = nn.Sequential(
+            nn.Conv1d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv1d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+        )
+        self.spatial = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels // 2, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels // 2, in_channels // 4, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels // 4, 1, kernel_size=1),
+        )
+
+    def forward(self, x):
+        b, t, c, h, w = x.shape
+        x = x.permute(0, 3, 4, 2, 1).reshape(-1, c, t)
+        x = self.temporal(x).mean(-1)
+        x = x.view(b, h, w, c).permute(0, 3, 1, 2)
+
+        heatmap = self.spatial(x).squeeze(1)  # (B, H, W)
+        prob = F.softmax(heatmap.view(heatmap.shape[0], -1), dim=1)  # (B, H*W)
+
+        grid_y, grid_x = torch.meshgrid(
+            torch.arange(h, device=x.device),
+            torch.arange(w, device=x.device),
+            indexing='ij'
+        )
+        grid_x = grid_x.reshape(-1).float()
+        grid_y = grid_y.reshape(-1).float()
+
+        # soft-argmax + 归一化
+        pred_x = torch.sum(prob * grid_x, dim=1) / (w - 1)
+        pred_y = torch.sum(prob * grid_y, dim=1) / (h - 1)
+
+        return torch.stack([pred_x, pred_y], dim=1), heatmap  # (B, 2), (B, H, W)

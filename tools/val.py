@@ -29,6 +29,7 @@ def val_worker(rank, cfg):
         model = DDP(model, device_ids=[gpu_id])
 
     criterion = builder.build_criterion().to(gpu_id)
+    evaluator = builder.build_evaluator(gpu_id)
     dataset = builder.build_dataset('val')
     if cfg.GPU_NUM > 1:
         sampler = DistributedSampler(dataset, num_replicas=cfg.GPU_NUM, rank=rank, shuffle=False, drop_last=False)
@@ -42,13 +43,14 @@ def val_worker(rank, cfg):
         sampler=sampler,
     )
 
-    label_map = load_label_map(os.path.join(cfg.data_params.root_path, cfg.data_params.class_map))
-    target_names = [label_map[i] for i in range(len(label_map))]
+    # label_map = load_label_map(os.path.join(cfg.data_params.root_path, cfg.data_params.class_map))
+    # target_names = [label_map[i] for i in range(len(label_map))]
 
-    loss, acc, preds_tensor, targets_tensor = run_epoch(model, loader_val, criterion, gpu_id, is_train=False)
+    loss, acc = run_epoch(model, loader_val, criterion, evaluator, gpu_id, is_train=False)
     if rank_zero():
         logger.log(f'Val: Loss={loss:.3f}, Acc={acc:.2%}')
-        all_class_report(logger, preds_tensor.cpu().numpy(), targets_tensor.cpu().numpy(), len(target_names), target_names)
+        # all_class_report(logger, preds_tensor.cpu().numpy(), targets_tensor.cpu().numpy(), len(target_names), target_names)
+        evaluator.log_metrics(logger, cfg)
 
     if cfg.GPU_NUM > 1:
         cleanup_ddp()

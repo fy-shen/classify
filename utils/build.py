@@ -86,7 +86,7 @@ class Builder:
         name = self.cfg.train.loss
         obj = get_torch_obj(name, [nn])
         if obj:
-            args = OmegaConf.to_container(self.cfg.train.get("loss_params", {}), resolve=True)
+            args = OmegaConf.to_container(self.cfg.train.get("loss_params") or OmegaConf.create({}), resolve=True)
             if args.get("weight", None) is not None:
                 args["weight"] = torch.FloatTensor(args["weight"])
             return obj(**args)
@@ -98,7 +98,7 @@ class Builder:
         name = self.cfg.train.optimizer
         obj = get_torch_obj(name, [optim])
         if obj:
-            args = OmegaConf.to_container(self.cfg.train.get("optim_params", {}), resolve=True)
+            args = OmegaConf.to_container(self.cfg.train.get("optim_params") or OmegaConf.create({}), resolve=True)
             policies = model.get_optim_policies() if hasattr(model, 'get_optim_policies') else model.parameters()
             return obj(policies, **args)
         else:
@@ -110,7 +110,7 @@ class Builder:
             return None
         obj = get_torch_obj(name, [optim.lr_scheduler])
         if obj:
-            args = OmegaConf.to_container(self.cfg.train.get("scheduler_params", {}), resolve=True)
+            args = OmegaConf.to_container(self.cfg.train.get("scheduler_params") or OmegaConf.create({}), resolve=True)
             scheduler = obj(optimizer, **args)
             return scheduler
         else:
@@ -158,5 +158,12 @@ class Builder:
             return self.weights.transforms()
         else:
             raise ValueError(f"Dataset {self.cfg.dataset} has no matching transform.")
+
+    def build_evaluator(self, gpu_id):
+        name = self.cfg.evaluator
+        if name.lower() in CUSTOM_SET['evaluator']:
+            return CUSTOM_SET['evaluator'][name.lower()](gpu_id)
+        else:
+            raise ValueError(f"Evaluator {name} is not supported.")
 
 

@@ -9,6 +9,7 @@ CUSTOM_MODULES = {}
 CUSTOM_LOSSES = {}
 CUSTOM_TRANSFORMS = {}
 CUSTOM_DATASETS = {}
+CUSTOM_EVALUATOR = {}
 
 CUSTOM_SET = {
     'model': CUSTOM_MODELS,
@@ -16,6 +17,7 @@ CUSTOM_SET = {
     'loss': CUSTOM_LOSSES,
     'transform': CUSTOM_TRANSFORMS,
     'dataset': CUSTOM_DATASETS,
+    'evaluator': CUSTOM_EVALUATOR
 }
 
 
