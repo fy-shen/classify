@@ -25,12 +25,6 @@ def run_epoch(
         is_train=True,
 ):
     model.train() if is_train else model.eval()
-
-    # total_loss = torch.tensor(0.0, device=gpu_id)
-    # total_correct = torch.tensor(0, device=gpu_id)
-    # total_samples = torch.tensor(0, device=gpu_id)
-    #
-    # all_preds, all_targets, preds_tensor, targets_tensor = [], [], None, None
     if evaluator is not None:
         evaluator.reset()
 

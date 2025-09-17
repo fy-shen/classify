@@ -4,7 +4,7 @@ import torch
 from archs import register
 from archs.evaluator import BaseEvaluator
 from utils.file import load_label_map
-from utils.distributed import reduce_tensor, gather_tensor
+from utils.distributed import rank_zero, reduce_tensor, gather_tensor
 
 
 @register('evaluator')
@@ -44,7 +44,7 @@ class Classify(BaseEvaluator):
         avg_loss = reduced_loss.item() / reduced_count.item()
         avg_acc = reduced_acc.item() / reduced_count.item()
 
-        if not is_train:
+        if not is_train and rank_zero():
             preds = torch.cat(self.preds)
             targets = torch.cat(self.targets)
             self.preds_array = gather_tensor(preds).cpu().numpy()

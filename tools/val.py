@@ -1,16 +1,12 @@
-import os
 
-import torch
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 
 from tools.train import run_epoch
 from utils import set_random_seed, Logger
-from utils.file import load_label_map
 from utils.build import Builder
 from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero
-from utils.metrics import all_class_report
 
 
 def val_worker(rank, cfg):
