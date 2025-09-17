@@ -4,7 +4,7 @@ import torch
 from archs import register
 from archs.evaluator import BaseEvaluator
 from utils.file import load_label_map
-from utils.distributed import rank_zero, reduce_tensor, gather_tensor
+from utils.distributed import reduce_tensor, gather_tensor
 
 
 @register('evaluator')
@@ -44,11 +44,12 @@ class Classify(BaseEvaluator):
         avg_loss = reduced_loss.item() / reduced_count.item()
         avg_acc = reduced_acc.item() / reduced_count.item()
 
-        if not is_train and rank_zero():
+        if not is_train:
             preds = torch.cat(self.preds)
             targets = torch.cat(self.targets)
-            self.preds_array = gather_tensor(preds).cpu().numpy()
-            self.targets_array = gather_tensor(targets).cpu().numpy()
+            # 该操作需所有rank一起进入
+            self.preds_array = gather_tensor(preds)
+            self.targets_array = gather_tensor(targets)
 
         return avg_loss, avg_acc
 
@@ -57,7 +58,7 @@ class Classify(BaseEvaluator):
         label_map = load_label_map(os.path.join(cfg.data_params.root_path, cfg.data_params.class_map))
         cls_names = [label_map[i] for i in range(len(label_map))]
         cls_num = len(cls_names)
-        preds, targets = self.preds_array, self.targets_array
+        preds, targets = self.preds_array.cpu().numpy(), self.targets_array.cpu().numpy()
 
         logger.log(f"{'Class':<15}{'TP':<8}{'FP':<8}{'P':<8}{'R':<8}{'F1':<8}{'Support'}")
         precision, recall, f1, support = precision_recall_fscore_support(

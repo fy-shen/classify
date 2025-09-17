@@ -39,13 +39,9 @@ def val_worker(rank, cfg):
         sampler=sampler,
     )
 
-    # label_map = load_label_map(os.path.join(cfg.data_params.root_path, cfg.data_params.class_map))
-    # target_names = [label_map[i] for i in range(len(label_map))]
-
     loss, acc = run_epoch(model, loader_val, criterion, evaluator, gpu_id, is_train=False)
     if rank_zero():
         logger.log(f'Val: Loss={loss:.3f}, Acc={acc:.2%}')
-        # all_class_report(logger, preds_tensor.cpu().numpy(), targets_tensor.cpu().numpy(), len(target_names), target_names)
         evaluator.log_metrics(logger, cfg)
 
     if cfg.GPU_NUM > 1:

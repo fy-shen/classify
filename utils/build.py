@@ -10,6 +10,7 @@ import torchvision.models as models
 import torchvision.datasets as datasets
 
 from archs import CUSTOM_SET, get_torch_obj
+from utils.distributed import rank_zero
 
 
 class Builder:
@@ -23,7 +24,8 @@ class Builder:
             torch.load(weight_path, weights_only=False)
 
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-        self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
+        if rank_zero():
+            self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
 
     def build_model(self, mode):
         name = self.cfg.model
