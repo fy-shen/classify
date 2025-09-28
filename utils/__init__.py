@@ -125,7 +125,7 @@ class Logger:
 
     def plot_history(self):
         self.plot_pic('loss', 'Loss', 'Train and Val Loss', 'loss.png')
-        self.plot_pic('acc', 'Acc', 'Train and Val Acc', 'acc.png')
+        self.plot_pic('metric', 'Metric', 'Train and Val Metric', 'metric.png')
 
     def plot_pic(self, key, ylabel, title, fn):
         plt.figure(figsize=(10, 6))

@@ -10,6 +10,8 @@ modality: RGB
 num_workers: 4
 input_size: [252, 896]
 pad_size: [448, 896]
+evaluator: Classify
+
 data_params:
   root_path: /app/Football/DeadBall
   train_list: splits/deadball/train.txt

@@ -8,6 +8,8 @@ data_trans: deadball_tsm_rgb
 modality: RGB
 num_workers: 2
 input_size: 252
+evaluator: Classify
+
 data_params:
   root_path: /app/Football/DeadBall
   train_list: splits/highlight/train.txt

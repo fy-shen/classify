@@ -33,6 +33,7 @@ def run_epoch(
     with torch.set_grad_enabled(is_train):
         for step, (inputs, targets) in enumerate(pbar):
             # print(inputs.shape)
+            # print(targets.shape)
             inputs = inputs.to(gpu_id, non_blocking=True)
             targets = targets.to(gpu_id, non_blocking=True)
 
@@ -45,7 +46,7 @@ def run_epoch(
                 loss.backward()
                 optimizer.step()
 
-            evaluator.update(outputs.detach(), targets.detach(), loss, is_train)
+            evaluator.update(outputs, targets, loss, is_train)
             if rank_zero():
                 pbar.set_postfix(evaluator.get_current_metrics())
 
@@ -114,7 +115,7 @@ def train_worker(rank, cfg):
     }
     if cfg.train.get("resume", False):
         if Path(cfg.train.resume_path).is_file():
-            checkpoint = torch.load(cfg.train.resume_path, map_location=f"cuda:{gpu_id}")
+            checkpoint = torch.load(cfg.train.resume_path, map_location=f"cuda:{gpu_id}", weights_only=False)
             state_dict = checkpoint.get('model', checkpoint)
             model.load_state_dict(state_dict)
             if 'optimizer' in checkpoint:
@@ -160,6 +161,8 @@ def train_worker(rank, cfg):
             if rank_zero() and val_metric is not None:
                 ckpt["history"] = logger.history
                 logger.log(f"          | Val  : Loss={val_loss:.3f} | Metric={val_metric:.2%}", False)
+                evaluator.log_metrics(logger, cfg)
+
                 if val_metric >= best_metric:
                     best_metric = val_metric
                     ckpt["best_metric"] = best_metric

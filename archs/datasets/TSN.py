@@ -3,6 +3,7 @@ from omegaconf import OmegaConf
 import numpy as np
 from PIL import Image
 
+import torch
 import torch.utils.data as data
 
 from archs import register
@@ -120,3 +121,92 @@ class TSNDataset(data.Dataset):
 
     def __len__(self):
         return len(self.video_list)
+
+
+class FrameRecord(object):
+    def __init__(self, row):
+        self._data = row
+
+    @property
+    def path(self):
+        return self._data[0]
+
+    @property
+    def idx(self):
+        return int(self._data[1])
+
+    @property
+    def label(self):
+        return [float(self._data[2]), float(self._data[3])]
+
+
+@register('dataset')
+class TPDataset(data.Dataset):
+    def __init__(self, cfg, is_train, transform):
+        model_cfg = OmegaConf.load(cfg.model_cfg)
+        self.cfg = OmegaConf.merge(cfg, model_cfg)
+        self.is_train = is_train
+        self.transform = transform
+        self.num_seg = self.cfg.num_seg
+
+        data_params = self.cfg.data_params
+        self.root_path = data_params.root_path
+        self.list_file = data_params.train_list if is_train else data_params.val_list
+        self.image_tmpl = data_params.image_tmpl
+        self.gap = data_params.gap
+
+        self._parse_list()
+
+    def _parse_list(self):
+        tmp = [x.strip().split(' ') for x in open(os.path.join(self.root_path, self.list_file))]
+        self.frame_list = [FrameRecord(item) for item in tmp]
+
+    def _get_indices(self, record):
+        offsets = []
+        max_idx = len(os.listdir(os.path.join(self.root_path, 'images', record.path))) - 1
+        for i in range(0 - self.num_seg // 2, self.num_seg - self.num_seg // 2):
+            idx = record.idx + i * self.gap
+            if idx < 0:
+                idx = 0
+            if idx > max_idx:
+                idx = max_idx
+            offsets.append(idx + 1)
+        return offsets
+
+    def _load_image(self, directory, idx):
+        img_path = os.path.join(self.root_path, 'images', directory, self.image_tmpl.format(idx))
+        img_backup = os.path.join(self.root_path, 'images', directory, self.image_tmpl.format(1))
+        try:
+            return [Image.open(img_path).convert('RGB')]
+        except Exception:
+            print('Error loading image:', img_path)
+            return [Image.open(img_backup).convert('RGB')]
+
+    def __len__(self):
+        return len(self.frame_list)
+
+    def __getitem__(self, index):
+        record = self.frame_list[index]
+        indices = self._get_indices(record)
+        return self.get(record, indices)
+
+    def trans_label(self, label):
+        x, y = label
+        rh, rw = self.cfg.input_size
+        ph, pw = self.cfg.pad_size
+        x = (x * rw + (pw - rw) // 2) / pw
+        y = (y * rh + (ph - rh) // 2) / ph
+        return [x, y]
+
+    def get(self, record, indices):
+        images = list()
+        for idx in indices:
+            seg_imgs = self._load_image(record.path, idx)
+            images.extend(seg_imgs)
+
+        # [T,C,H,W]
+        process_data = self.transform(images)
+        return process_data, torch.tensor(self.trans_label(record.label))
+
+
+

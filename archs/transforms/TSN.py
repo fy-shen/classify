@@ -122,7 +122,7 @@ def deadball_tsm_rgb(cfg, is_train):
 
 
 @register('transform')
-def deadball_posmlp_rgb(cfg, is_train):
+def resize_pad_imglist(cfg, is_train):
     if is_train:
         return v2.Compose([
             v2.Resize(cfg.input_size, antialias=True),

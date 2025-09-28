@@ -22,7 +22,7 @@ class Builder:
     def load_weights(self, model, weight_path, is_train=False):
         state_dict = model.get_state_dict(weight_path, is_train) if hasattr(model, 'get_state_dict') else \
             torch.load(weight_path, weights_only=False)
-
+        state_dict = state_dict.get('model', state_dict)
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         if rank_zero():
             self.logger.log_pretrain_msg(missing_keys, unexpected_keys)
@@ -50,7 +50,7 @@ class Builder:
                     weights = None
             model = obj(weights=weights)
 
-            if hasattr(model, 'fc') and isinstance(model.fc, nn.Linear):
+            if hasattr(model, 'fc') and isinstance(model.fc, nn.Linear) and self.cfg.get('num_classes'):
                 in_features = model.fc.in_features
                 model.fc = nn.Linear(in_features, self.cfg.num_classes)
 
@@ -94,6 +94,8 @@ class Builder:
             return obj(**args)
 
         # TODO: custom loss
+        elif name.lower() in CUSTOM_SET['loss']:
+            return CUSTOM_SET['loss'][name.lower()](self.cfg)
         raise ValueError(f"Loss function {name} is not supported.")
 
     def build_optimizer(self, model):

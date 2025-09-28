@@ -198,10 +198,10 @@ def make_non_local(net, n_seg):
 
 @register('model')
 class TSMPoint(nn.Module):
-    def __init__(self):
+    def __init__(self, cfg):
         super(TSMPoint, self).__init__()
-        self.num_seg = 5
-        self.num_div = 8
+        self.num_seg = cfg.num_seg
+        self.num_div = cfg.num_div
         self.base_model = models.resnet50(weights='DEFAULT')
         make_temporal_shift(
             self.base_model, self.num_seg, self.num_div
@@ -218,26 +218,34 @@ class TSMPoint(nn.Module):
         x = x.view(-1, c, h, w)
         feat = self.base_model(x)
         feat = feat.view((-1, self.num_seg) + feat.size()[1:])
-        coords = self.head(feat)
-        return coords
+        out = self.head(feat)
+        return out
 
 
 class HeatmapHead(nn.Module):
     def __init__(self, in_channels):
         super().__init__()
+        self.sigma = 5
         self.temporal = nn.Sequential(
             nn.Conv1d(in_channels, in_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv1d(in_channels, in_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
         )
-        self.spatial = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels // 2, kernel_size=3, padding=1),
+        # self.spatial = nn.Sequential(
+        #     nn.Conv2d(in_channels, in_channels // 2, kernel_size=3, padding=1),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(in_channels // 2, in_channels // 4, kernel_size=3, padding=1),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(in_channels // 4, 1, kernel_size=1),
+        # )
+        self.deconv = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=4, stride=2, padding=1),  # up 2x
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels // 2, in_channels // 4, kernel_size=3, padding=1),
+            nn.ConvTranspose2d(in_channels // 2, in_channels // 4, kernel_size=4, stride=2, padding=1),  # up 4x
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels // 4, 1, kernel_size=1),
         )
+        self.out_conv = nn.Conv2d(in_channels // 4, 1, kernel_size=1)
 
     def forward(self, x):
         b, t, c, h, w = x.shape
@@ -245,9 +253,11 @@ class HeatmapHead(nn.Module):
         x = self.temporal(x).mean(-1)
         x = x.view(b, h, w, c).permute(0, 3, 1, 2)
 
-        heatmap = self.spatial(x).squeeze(1)  # (B, H, W)
-        prob = F.softmax(heatmap.view(heatmap.shape[0], -1), dim=1)  # (B, H*W)
+        x = self.deconv(x)
+        heatmap = self.out_conv(x).squeeze(1)  # (B, H, W)
+        prob = F.softmax(heatmap.view(heatmap.shape[0], -1) / self.sigma, dim=1)  # (B, H*W)
 
+        _, h, w = heatmap.shape
         grid_y, grid_x = torch.meshgrid(
             torch.arange(h, device=x.device),
             torch.arange(w, device=x.device),

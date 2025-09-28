@@ -48,8 +48,8 @@ class Classify(BaseEvaluator):
             preds = torch.cat(self.preds)
             targets = torch.cat(self.targets)
             # 该操作需所有rank一起进入
-            self.preds_array = gather_tensor(preds)
-            self.targets_array = gather_tensor(targets)
+            self.preds_tensor = gather_tensor(preds)
+            self.targets_tensor = gather_tensor(targets)
 
         return avg_loss, avg_acc
 
@@ -58,7 +58,7 @@ class Classify(BaseEvaluator):
         label_map = load_label_map(os.path.join(cfg.data_params.root_path, cfg.data_params.class_map))
         cls_names = [label_map[i] for i in range(len(label_map))]
         cls_num = len(cls_names)
-        preds, targets = self.preds_array.cpu().numpy(), self.targets_array.cpu().numpy()
+        preds, targets = self.preds_tensor.cpu().numpy(), self.targets_tensor.cpu().numpy()
 
         logger.log(f"{'Class':<15}{'TP':<8}{'FP':<8}{'P':<8}{'R':<8}{'F1':<8}{'Support'}")
         precision, recall, f1, support = precision_recall_fscore_support(

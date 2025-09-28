@@ -36,7 +36,6 @@ train:
     gamma: 0.5
 
   loss: crossentropyloss
-  loss_params:
   epochs: 50
   batchsize: 4
   resume: False
