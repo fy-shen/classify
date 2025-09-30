@@ -1,0 +1,44 @@
+num_seg: 1
+
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [3, 32, 3, 2]] # 0-P1/2
+  - [-1, 1, Conv, [32, 64, 3, 2]] # 1-P2/4
+  - [-1, 1, C2f, [64, 64, 1, True]]
+  - [-1, 1, Conv, [64, 128, 3, 2]] # 3-P3/8
+  - [-1, 1, C2f, [128, 128, 2, True]]
+  - [-1, 1, Conv, [128, 256, 3, 2]] # 5-P4/16
+  - [-1, 1, C2f, [256, 256, 2, True]]
+  - [-1, 1, Conv, [256, 512, 3, 2]] # 7-P5/32
+  - [-1, 1, C2f, [512, 512, 1, True]]
+  - [-1, 1, SPPF, [512, 512, 5]] # 9
+
+# YOLOv8.0-p2 head
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 6], 1, Concat, [1]] # cat backbone P4
+  - [-1, 1, C2f, [768, 256, 1]] # 12
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 4], 1, Concat, [1]] # cat backbone P3
+  - [-1, 1, C2f, [384, 128, 1]] # 15 (P3/8-small)
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 2], 1, Concat, [1]] # cat backbone P2
+  - [-1, 1, C2f, [192, 64, 1]] # 18 (P2/4-xsmall)
+
+#  - [-1, 1, Conv, [64, 64, 3, 2]]
+#  - [[-1, 15], 1, Concat, [1]] # cat head P3
+#  - [-1, 1, C2f, [192, 128]] # 21 (P3/8-small)
+#
+#  - [-1, 1, Conv, [128, 128, 3, 2]]
+#  - [[-1, 12], 1, Concat, [1]] # cat head P4
+#  - [-1, 1, C2f, [384, 256]] # 24 (P4/16-medium)
+  - [[18], 1, ImgHeatmap, [64]]
+
+#  - [-1, 1, Conv, [256, 256, 3, 2]]
+#  - [[-1, 9], 1, Concat, [1]] # cat head P5
+#  - [-1, 1, C2f, [768, 512]] # 27 (P5/32-large)
+#
+#  - [[18, 21, 24, 27], 1, Detect, [80]] # Detect(P2, P3, P4, P5)

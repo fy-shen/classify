@@ -12,6 +12,15 @@ class BaseModel(nn.Module):
         super().__init__()
         self.model, self.save = parse_model(deepcopy(cfg))
 
+    def predict(self, x):
+        y = []  # outputs
+        for m in self.model:
+            if m.f != -1:
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]
+            x = m(x)
+            y.append(x if m.i in self.save else None)
+        return x
+
 
 def parse_model(model_dict):
     layers, save = [], []

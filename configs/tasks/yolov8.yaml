@@ -1,0 +1,55 @@
+model: YOLO
+model_cfg: configs/models/yolov8s-p2.yaml
+save_dir: /media/sfy/disk1/dataset/football/dead_ball/checkpoints/Point/YOLO
+
+dataset: TPDataset
+data_trans: resize_pad_imglist
+num_workers: 2
+input_size: [252, 896]
+pad_size: [256, 896]
+evaluator: RegressPoint
+
+data_params:
+  root_path: /app/Football/DeadBall
+  train_list: splits/Point/train.txt
+  val_list: splits/Point/val.txt
+  image_tmpl: '{:06d}.jpg'
+  gap: 7
+
+train:
+  enable: True
+  pretrained: pretrain/yolov8s-p2-p4.pth
+
+  optimizer: AdamW
+  optim_params:
+    lr: 5e-4
+    weight_decay: 1e-4
+
+  scheduler: CosineAnnealingLR
+  scheduler_params:
+    T_max: 50
+    eta_min: 1e-6
+
+  loss: CoordHeatmapLoss
+  loss_params:
+    lambda_coord: 1.0
+    lambda_heatmap: 80.0
+    sigma: 2
+
+  epochs: 50
+  batchsize: 32
+  resume: False
+  resume_path:
+
+val:
+  enable: False
+  weight:
+  batchsize: 6
+
+test:
+  enable: False
+  code: point
+  weight: /media/sfy/disk1/dataset/football/dead_ball/checkpoints/Point/test/best.pth
+  video_path: videos/20240420-202554.mp4
+  label_path: arrays/point
+  save_vid: True
