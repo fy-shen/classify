@@ -1,6 +1,7 @@
 datasets/
 !archs/datasets/
 checkpoints/
+configs/tasks/local/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
