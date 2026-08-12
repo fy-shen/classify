@@ -149,3 +149,8 @@ def resize_pad_imglist(cfg, is_train):
             ),
             StackImageList(),
         ])
+
+
+@register('transform')
+def deadball_posmlp_rgb(cfg, is_train):
+    return resize_pad_imglist(cfg, is_train)

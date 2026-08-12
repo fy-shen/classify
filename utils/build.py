@@ -44,7 +44,8 @@ class Builder:
                 try:
                     weight_enum = models.get_model_weights(obj)
                     self.weights = getattr(weight_enum, weights)
-                    self.logger.log(f"Load weights for {name}: {self.weights}")
+                    if self.logger is not None and rank_zero():
+                        self.logger.log(f"Load weights for {name}: {self.weights}")
                 except Exception as e:
                     warnings.warn(f"Failed to load weights enum for {name}: {e}")
                     weights = None
@@ -103,10 +104,35 @@ class Builder:
         obj = get_torch_obj(name, [optim])
         if obj:
             args = OmegaConf.to_container(self.cfg.train.get("optim_params") or OmegaConf.create({}), resolve=True)
-            policies = model.get_optim_policies() if hasattr(model, 'get_optim_policies') else model.parameters()
+            if hasattr(model, 'get_optim_policies'):
+                policies = model.get_optim_policies()
+            elif hasattr(model, 'module') and hasattr(model.module, 'get_optim_policies'):
+                policies = model.module.get_optim_policies()
+            else:
+                policies = model.parameters()
+            policies = self._apply_optim_policy_multipliers(policies, args)
             return obj(policies, **args)
         else:
             raise ValueError(f"Optimizer {name} is not supported.")
+
+    @staticmethod
+    def _apply_optim_policy_multipliers(policies, optim_args):
+        if not isinstance(policies, list) or not all(isinstance(p, dict) for p in policies):
+            return policies
+
+        base_lr = optim_args.get("lr")
+        base_weight_decay = optim_args.get("weight_decay")
+        param_groups = []
+        for group in policies:
+            group = group.copy()
+            lr_mult = group.pop("lr_mult", None)
+            decay_mult = group.pop("decay_mult", None)
+            if lr_mult is not None and base_lr is not None:
+                group["lr"] = base_lr * lr_mult
+            if decay_mult is not None and base_weight_decay is not None:
+                group["weight_decay"] = base_weight_decay * decay_mult
+            param_groups.append(group)
+        return param_groups
 
     def build_scheduler(self, optimizer):
         name = self.cfg.train.get("scheduler", None)
@@ -169,5 +195,3 @@ class Builder:
             return CUSTOM_SET['evaluator'][name.lower()](gpu_id)
         else:
             raise ValueError(f"Evaluator {name} is not supported.")
-
-

@@ -58,17 +58,19 @@ def run_epoch(
 
 
 def train_worker(rank, cfg):
+    gpu_id = cfg.GPU_IDS[rank]
+    if cfg.GPU_NUM > 1:
+        setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
+
     logger = Logger(cfg) if rank_zero() else None
     logger.log_cfg(cfg) if rank_zero() else None
     set_random_seed(cfg.SEED, cfg.DETERMINISTIC)
-    gpu_id = cfg.GPU_IDS[rank]
 
     start_time = time.time()
 
     builder = Builder(cfg, logger)
     model = builder.build_model('train').to(gpu_id)
     if cfg.GPU_NUM > 1:
-        setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
         model = DDP(model, device_ids=[gpu_id])
 
     criterion = builder.build_criterion().to(gpu_id)

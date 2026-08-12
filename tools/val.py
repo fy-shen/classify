@@ -10,18 +10,20 @@ from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero
 
 
 def val_worker(rank, cfg):
+    gpu_id = cfg.GPU_IDS[rank]
+    if cfg.GPU_NUM > 1:
+        setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
+
     logger = None
     if rank_zero():
         logger = Logger(cfg)
         logger.log_cfg(cfg)
 
     set_random_seed(cfg.SEED, cfg.DETERMINISTIC)
-    gpu_id = cfg.GPU_IDS[rank]
 
     builder = Builder(cfg, logger)
     model = builder.build_model('val').to(gpu_id)
     if cfg.GPU_NUM > 1:
-        setup_ddp(rank, cfg.GPU_NUM, cfg.GPU_IDS)
         model = DDP(model, device_ids=[gpu_id])
 
     criterion = builder.build_criterion().to(gpu_id)
