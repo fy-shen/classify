@@ -1,6 +1,6 @@
-import os
+import ast
 import importlib
-import pkgutil
+from pathlib import Path
 from typing import Optional, Callable, Union
 
 
@@ -20,11 +20,14 @@ CUSTOM_SET = {
     'evaluator': CUSTOM_EVALUATOR
 }
 
+REGISTRY_MODULES = None
+
 
 def register(kind: str, name: Optional[Union[str, Callable]] = None):
     def decorator(class_obj: Callable):
-        key = name or class_obj.__name__.lower()
-        custom_obj = CUSTOM_SET.get(kind, None)
+        key = (name or class_obj.__name__).lower()
+        kind_key = kind.lower()
+        custom_obj = CUSTOM_SET.get(kind_key, None)
         if custom_obj is None:
             raise Warning("Unknown kind '{}', register '{}' failed".format(kind, name))
         else:
@@ -38,6 +41,67 @@ def register(kind: str, name: Optional[Union[str, Callable]] = None):
     return decorator
 
 
+def _literal_str(node):
+    return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+
+
+def _register_call(decorator):
+    if not isinstance(decorator, ast.Call):
+        return None
+    if not isinstance(decorator.func, ast.Name) or decorator.func.id != 'register':
+        return None
+    return decorator
+
+
+def _build_registry_modules():
+    registry_modules = {kind: {} for kind in CUSTOM_SET}
+    root = Path(__file__).resolve().parent
+    for path in sorted(root.rglob('*.py')):
+        if path.name == '__init__.py':
+            continue
+        module_name = '.'.join((__name__, *path.relative_to(root).with_suffix('').parts))
+        try:
+            tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+        except SyntaxError:
+            continue
+        for node in tree.body:
+            if not isinstance(node, (ast.ClassDef, ast.FunctionDef)):
+                continue
+            for decorator in node.decorator_list:
+                call = _register_call(decorator)
+                if call is None or not call.args:
+                    continue
+                kind = _literal_str(call.args[0])
+                if kind is None:
+                    continue
+                kind_key = kind.lower()
+                if kind_key not in registry_modules:
+                    continue
+                name = _literal_str(call.args[1]) if len(call.args) > 1 else None
+                key = (name or node.name).lower()
+                registry_modules[kind_key][key] = module_name
+    return registry_modules
+
+
+def ensure_registered(kind: str, name: Optional[str]):
+    if name is None:
+        return None
+    global REGISTRY_MODULES
+    kind_key = kind.lower()
+    key = name.lower()
+    custom_obj = CUSTOM_SET.get(kind_key)
+    if custom_obj is None:
+        raise ValueError(f"Unknown registry kind: {kind}")
+    if key not in custom_obj:
+        if REGISTRY_MODULES is None:
+            # 只扫描源码里的装饰器，不导入实现模块；命中配置项时再 import。
+            REGISTRY_MODULES = _build_registry_modules()
+        module_name = REGISTRY_MODULES.get(kind_key, {}).get(key)
+        if module_name is not None:
+            importlib.import_module(module_name)
+    return custom_obj.get(key)
+
+
 def get_torch_obj(name, modules):
     name_low = name.lower()
     for mod in modules:
@@ -49,7 +113,3 @@ def get_torch_obj(name, modules):
             if key.lower() == name_low:
                 return getattr(mod, key)
     return None
-
-
-for _, modname, ispkg in pkgutil.walk_packages(path=[os.path.dirname(__file__)], prefix=f"{__name__}."):
-    importlib.import_module(modname)

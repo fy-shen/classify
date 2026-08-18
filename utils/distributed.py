@@ -2,6 +2,7 @@ import os
 import socket
 import torch
 import torch.distributed as dist
+from torch.utils.data import Sampler
 
 
 def find_free_port():
@@ -28,12 +29,7 @@ def setup_ddp(rank, world_size, gpu_ids):
         world_size: 总进程数（总 GPU 数）
         gpu_ids: GPU 列表，如 [0, 1, 2, 3]
     """
-    dist.init_process_group(
-        backend='nccl',
-        init_method='env://',
-        rank=rank,
-        world_size=world_size
-    )
+    dist.init_process_group(backend='nccl', init_method='env://', rank=rank, world_size=world_size)
     torch.cuda.set_device(gpu_ids[rank])
 
 
@@ -55,6 +51,13 @@ def reduce_tensor(tensor, op=dist.ReduceOp.SUM):
         return rt
     else:
         return tensor
+
+
+def sync_module_buffers(module, src=0):
+    # DDP eval 绕过 wrapper 时，先同步 BN 等 buffer，保证各 rank 推理状态一致。
+    if dist.is_initialized():
+        for buffer in module.buffers():
+            dist.broadcast(buffer, src=src)
 
 
 def gather_tensor(tensor, dst=0):
@@ -87,3 +90,24 @@ def gather_tensor(tensor, dst=0):
             return None
     else:
         return tensor
+
+
+class DistributedEvalSampler(Sampler):
+    """
+    验证/测试用分布式采样器：按 rank 切分索引，不补齐样本，避免重复样本污染指标。
+    """
+    def __init__(self, dataset, num_replicas=None, rank=None):
+        if num_replicas is None:
+            num_replicas = dist.get_world_size()
+        if rank is None:
+            rank = dist.get_rank()
+        self.dataset = dataset
+        self.num_replicas = num_replicas
+        self.rank = rank
+        self.indices = list(range(len(dataset)))[rank::num_replicas]
+
+    def __iter__(self):
+        return iter(self.indices)
+
+    def __len__(self):
+        return len(self.indices)

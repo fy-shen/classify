@@ -154,3 +154,30 @@ def resize_pad_imglist(cfg, is_train):
 @register('transform')
 def deadball_posmlp_rgb(cfg, is_train):
     return resize_pad_imglist(cfg, is_train)
+
+
+@register('transform')
+def shot_tsm_rgb(cfg, is_train):
+    if is_train:
+        return v2.Compose([
+            v2.Resize(cfg.input_size, antialias=True),
+            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            ),
+            StackImageList()
+        ])
+    else:
+        return v2.Compose([
+            v2.Resize(cfg.input_size, antialias=True),
+            ToImageList(),
+            ToDtypeList(torch.float32, scale=True),
+            NormalizeList(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            ),
+            StackImageList()
+        ])

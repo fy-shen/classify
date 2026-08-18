@@ -1,12 +1,12 @@
 
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader
 
 from tools.train import run_epoch
 from utils import set_random_seed, Logger
 from utils.build import Builder
-from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero
+from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero, DistributedEvalSampler
 
 
 def val_worker(rank, cfg):
@@ -30,7 +30,7 @@ def val_worker(rank, cfg):
     evaluator = builder.build_evaluator(gpu_id)
     dataset = builder.build_dataset('val')
     if cfg.GPU_NUM > 1:
-        sampler = DistributedSampler(dataset, num_replicas=cfg.GPU_NUM, rank=rank, shuffle=False, drop_last=False)
+        sampler = DistributedEvalSampler(dataset, num_replicas=cfg.GPU_NUM, rank=rank)
     else:
         sampler = None
     loader_val = DataLoader(

@@ -4,7 +4,7 @@ from copy import deepcopy
 import torch
 import torch.nn as nn
 
-from . import CUSTOM_MODULES
+from . import ensure_registered
 
 
 class BaseModel(nn.Module):
@@ -26,7 +26,10 @@ def parse_model(model_dict):
     layers, save = [], []
     # from, number repeats, module, args
     for i, (f, n, m, args) in enumerate(model_dict["backbone"] + model_dict["head"]):
-        m = getattr(torch.nn, m[3:]) if "nn." in m else CUSTOM_MODULES[m.lower()]
+        module_name = m
+        m = getattr(torch.nn, module_name[3:]) if "nn." in module_name else ensure_registered('module', module_name)
+        if m is None:
+            raise ValueError(f"Module {module_name} is not registered.")
         for j, a in enumerate(args):
             if isinstance(a, str):
                 try:

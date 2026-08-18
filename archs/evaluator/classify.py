@@ -41,13 +41,18 @@ class Classify(BaseEvaluator):
         reduced_acc = reduce_tensor(self.correct)
         reduced_count = reduce_tensor(self.samples)
 
-        avg_loss = reduced_loss.item() / reduced_count.item()
-        avg_acc = reduced_acc.item() / reduced_count.item()
+        sample_count = reduced_count.item()
+        avg_loss = reduced_loss.item() / sample_count if sample_count else 0.0
+        avg_acc = reduced_acc.item() / sample_count if sample_count else 0.0
 
         if not is_train:
-            preds = torch.cat(self.preds)
-            targets = torch.cat(self.targets)
-            # 该操作需所有rank一起进入
+            if self.preds:
+                preds = torch.cat(self.preds)
+                targets = torch.cat(self.targets)
+            else:
+                preds = torch.empty(0, dtype=torch.long, device=self.gpu_id)
+                targets = torch.empty(0, dtype=torch.long, device=self.gpu_id)
+            # 所有 rank 都需进入 gather，rank0 汇总完整且不重复的验证结果。
             self.preds_tensor = gather_tensor(preds)
             self.targets_tensor = gather_tensor(targets)
 
@@ -55,7 +60,13 @@ class Classify(BaseEvaluator):
 
     def log_metrics(self, logger, cfg):
         from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
-        label_map = load_label_map(os.path.join(cfg.data_params.root_path, cfg.data_params.class_map))
+        class_map = cfg.data_params.get('class_map', None)
+        if class_map:
+            label_map = load_label_map(os.path.join(cfg.data_params.root_path, class_map))
+        else:
+            label_map = {i: name for i, name in enumerate(cfg.get('class_names', []))}
+            if not label_map:
+                label_map = {i: str(i) for i in range(cfg.num_classes)}
         cls_names = [label_map[i] for i in range(len(label_map))]
         cls_num = len(cls_names)
         preds, targets = self.preds_tensor.cpu().numpy(), self.targets_tensor.cpu().numpy()

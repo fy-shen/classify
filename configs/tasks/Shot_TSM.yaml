@@ -1,0 +1,58 @@
+model: TSN
+model_cfg: configs/models/Shot_TSM.yaml
+save_dir: checkpoints/Shot/TSM
+
+num_classes: 2
+class_names: [background, shot]
+dataset: ShotTSMDataset
+data_trans: shot_tsm_rgb
+modality: RGB
+num_workers: 2
+input_size: 252
+evaluator: Classify
+
+data_params:
+  root_path: /media/sfy/disk11/dataset/football/dead_ball
+  images_dir: images
+  annotation_dir: annotations/shot
+  image_tmpl: '{:06d}.jpg'
+  fps: 30                  # 标注时间戳换算帧号使用的帧率，需与抽帧规则一致
+  frame_stride: 2          # 一个 clip 内相邻采样帧的间隔，8帧时约覆盖 16 帧
+  pos_jitter: 2            # 训练正样本中心帧随机抖动范围，缓解标注点轻微偏差
+  pos_radius: 8            # 射门点附近视作正样本语义范围；负样本排除窗口至少覆盖该半径
+  neg_exclude_radius: 48   # 负样本中心需避开同半场射门点的最小距离
+  neg_per_pos: 3           # 训练集每个正样本对应的负样本数量
+  val_neg_per_pos: 3       # 验证集每个正样本对应的固定负样本数量
+  val_neg_stride: 48       # 构建验证负样本候选时的中心帧步长
+  val_ratio: 0.2           # 未提供 train_list/val_list 时，按视频划分验证集比例
+  split_seed: 2025         # 视频级随机划分的固定种子，保证 train/val 可复现
+
+train:
+  enable: True
+  pretrained: pretrain/TSM_kinetics_RGB_resnet50_shift8_blockres_avg_segment8_e50.pth
+  optimizer: SGD
+  optim_params:
+    lr: 0.0005
+    momentum: 0.9
+    weight_decay: 5e-4
+
+  scheduler: StepLR
+  scheduler_params:
+    step_size: 10
+    gamma: 0.5
+
+  loss: crossentropyloss
+  loss_params:
+    weight: [1.0, 3.0]
+  epochs: 50
+  batchsize: 8
+  resume: False
+  resume_path:
+
+val:
+  enable: False
+  weight: checkpoints/Shot/TSM/best.pth
+  batchsize: 16
+
+test:
+  enable: False

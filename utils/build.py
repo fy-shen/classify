@@ -9,7 +9,7 @@ import torch.optim as optim
 import torchvision.models as models
 import torchvision.datasets as datasets
 
-from archs import CUSTOM_SET, get_torch_obj
+from archs import ensure_registered, get_torch_obj
 from utils.distributed import rank_zero
 
 
@@ -18,6 +18,10 @@ class Builder:
         self.cfg = cfg
         self.logger = logger
         self.weights = None
+
+    @staticmethod
+    def _get_custom(kind, name):
+        return ensure_registered(kind, name)
 
     def load_weights(self, model, weight_path, is_train=False):
         state_dict = model.get_state_dict(weight_path, is_train) if hasattr(model, 'get_state_dict') else \
@@ -60,11 +64,11 @@ class Builder:
                 model.load_state_dict(ckpt.get("state_dict", ckpt))
 
         # custom model
-        elif name.lower() in CUSTOM_SET['model']:
+        elif self._get_custom('model', name):
             model_cfg = self.cfg.get("model_cfg", None)
             if model_cfg is None:
                 raise ValueError(f"Custom model '{name}' requires `model_cfg` to be specified in config.")
-            model = CUSTOM_SET['model'][name.lower()](OmegaConf.load(model_cfg))
+            model = self._get_custom('model', name)(OmegaConf.load(model_cfg))
 
             # TODO: pretrain
             if mode == 'train':
@@ -95,8 +99,8 @@ class Builder:
             return obj(**args)
 
         # TODO: custom loss
-        elif name.lower() in CUSTOM_SET['loss']:
-            return CUSTOM_SET['loss'][name.lower()](self.cfg)
+        elif self._get_custom('loss', name):
+            return self._get_custom('loss', name)(self.cfg)
         raise ValueError(f"Loss function {name} is not supported.")
 
     def build_optimizer(self, model):
@@ -166,8 +170,8 @@ class Builder:
                 f"Dataset '{name}' does not support 'split' or 'train' keyword. "
             )
         # custom dataset
-        elif name.lower() in CUSTOM_SET['dataset']:
-            return CUSTOM_SET['dataset'][name.lower()](self.cfg, is_train, transform=trans)
+        elif self._get_custom('dataset', name):
+            return self._get_custom('dataset', name)(self.cfg, is_train, transform=trans)
         else:
             raise ValueError(f"Unknown Dataset {name}.")
 
@@ -180,8 +184,9 @@ class Builder:
             pass
 
         # custom transform
-        if self.cfg.data_trans in CUSTOM_SET['transform']:
-            return CUSTOM_SET['transform'][self.cfg.data_trans](self.cfg, is_train=is_train)
+        trans = self._get_custom('transform', self.cfg.data_trans)
+        if trans:
+            return trans(self.cfg, is_train=is_train)
 
         # 使用 torchvision model 对应的 transform
         if self.weights is not None:
@@ -191,7 +196,8 @@ class Builder:
 
     def build_evaluator(self, gpu_id):
         name = self.cfg.evaluator
-        if name.lower() in CUSTOM_SET['evaluator']:
-            return CUSTOM_SET['evaluator'][name.lower()](gpu_id)
+        evaluator = self._get_custom('evaluator', name)
+        if evaluator:
+            return evaluator(gpu_id)
         else:
             raise ValueError(f"Evaluator {name} is not supported.")

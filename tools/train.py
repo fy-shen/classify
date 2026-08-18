@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 
 from utils import set_random_seed, Logger
 from utils.build import Builder
-from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero
+from utils.distributed import set_env, setup_ddp, cleanup_ddp, rank_zero, DistributedEvalSampler, sync_module_buffers
 
 
 def run_epoch(
@@ -25,6 +25,12 @@ def run_epoch(
         is_train=True,
 ):
     model.train() if is_train else model.eval()
+    if not is_train and isinstance(model, DDP):
+        sync_module_buffers(model.module)
+        # 验证集各 rank 样本数可能不同，绕过 DDP forward，避免隐式通信步数不一致。
+        run_model = model.module
+    else:
+        run_model = model
     if evaluator is not None:
         evaluator.reset()
 
@@ -40,7 +46,7 @@ def run_epoch(
             if is_train:
                 optimizer.zero_grad()
 
-            outputs = model(inputs)
+            outputs = run_model(inputs)
             loss = criterion(outputs, targets)
             if is_train:
                 loss.backward()
@@ -84,7 +90,7 @@ def train_worker(rank, cfg):
     dataset_val = builder.build_dataset('val')
     if cfg.GPU_NUM > 1:
         sampler_train = DistributedSampler(dataset_train, num_replicas=cfg.GPU_NUM, rank=rank, shuffle=True, drop_last=True)
-        sampler_val = DistributedSampler(dataset_val, num_replicas=cfg.GPU_NUM, rank=rank, shuffle=False, drop_last=False)
+        sampler_val = DistributedEvalSampler(dataset_val, num_replicas=cfg.GPU_NUM, rank=rank)
         shuffle = False
     else:
         sampler_train = None
@@ -119,7 +125,10 @@ def train_worker(rank, cfg):
         if Path(cfg.train.resume_path).is_file():
             checkpoint = torch.load(cfg.train.resume_path, map_location=f"cuda:{gpu_id}", weights_only=False)
             state_dict = checkpoint.get('model', checkpoint)
-            model.load_state_dict(state_dict)
+            load_model = model.module if isinstance(model, DDP) else model
+            if state_dict and all(k.startswith("module.") for k in state_dict):
+                state_dict = {k[len("module."):]: v for k, v in state_dict.items()}
+            load_model.load_state_dict(state_dict)
             if 'optimizer' in checkpoint:
                 optimizer.load_state_dict(checkpoint['optimizer'])
             if 'scheduler' in checkpoint and scheduler:
@@ -146,21 +155,21 @@ def train_worker(rank, cfg):
         if rank_zero():
             lr = optimizer.param_groups[0]["lr"]
             logger.log(f"Epoch {epoch:>3d} | Train: Loss={train_loss:.3f} | Metric={train_metric:.2%} | LR={lr:.4g}", False)
-        logger.update_history('train', {'epoch': epoch, 'loss': train_loss, 'metric': train_metric})
-        ckpt = {
-            "epoch": epoch,
-            "model": model.module.state_dict() if isinstance(model, DDP) else model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict() if scheduler else None,
-            "best_metric": best_metric,
-        }
+            logger.update_history('train', {'epoch': epoch, 'loss': train_loss, 'metric': train_metric})
+            ckpt = {
+                "epoch": epoch,
+                "model": model.module.state_dict() if isinstance(model, DDP) else model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict() if scheduler else None,
+                "best_metric": best_metric,
+            }
         # evaluate every EVAL_PERIOD epochs
         if (epoch + 1) % cfg.EVAL_PERIOD == 0:
             val_loss, val_metric = run_epoch(
                 model, loader_val, criterion, evaluator, gpu_id, is_train=False
             )
-            logger.update_history('val', {'epoch': epoch, 'loss': val_loss, 'metric': val_metric})
             if rank_zero() and val_metric is not None:
+                logger.update_history('val', {'epoch': epoch, 'loss': val_loss, 'metric': val_metric})
                 ckpt["history"] = logger.history
                 logger.log(f"          | Val  : Loss={val_loss:.3f} | Metric={val_metric:.2%}", False)
                 evaluator.log_metrics(logger, cfg)
@@ -177,7 +186,8 @@ def train_worker(rank, cfg):
                         "val_metric": val_metric
                     })
 
-        torch.save(ckpt, os.path.join(cfg.save_dir, "last.pth"))
+        if rank_zero():
+            torch.save(ckpt, os.path.join(cfg.save_dir, "last.pth"))
 
     if rank_zero():
         end_time = time.time()
